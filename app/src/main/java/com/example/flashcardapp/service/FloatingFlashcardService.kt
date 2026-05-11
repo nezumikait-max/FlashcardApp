@@ -5,9 +5,15 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
@@ -20,8 +26,16 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.example.flashcardapp.data.Flashcard
+import com.example.flashcardapp.repository.FlashcardRepository
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, ViewModelStoreOwner {
+
+    @Inject
+    lateinit var repository: FlashcardRepository
 
     private lateinit var windowManager: WindowManager
     private lateinit var composeView: ComposeView
@@ -51,9 +65,8 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         composeView = ComposeView(this).apply {
             setContent {
                 MaterialTheme {
-                    FloatingCard {
-                        stopSelf()
-                    }
+                    val flashcards by repository.getAllFlashcards().collectAsState(initial = emptyList())
+                    FloatingCard(flashcards = flashcards, onClose = { stopSelf() })
                 }
             }
         }
@@ -76,18 +89,48 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
 }
 
 @Composable
-fun FloatingCard(onClose: () -> Unit) {
+fun FloatingCard(flashcards: List<Flashcard>, onClose: () -> Unit) {
+    var currentIndex by remember { mutableStateOf(0) }
+    var showAnswer by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .padding(16.dp)
-            .width(250.dp),
+            .width(250.dp)
+            .clickable {
+                if (flashcards.isNotEmpty()) {
+                    showAnswer = !showAnswer
+                }
+            },
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Dummy Flashcard Question?", style = MaterialTheme.typography.titleMedium)
+            if (flashcards.isEmpty()) {
+                Text("No cards available. Add some in the app!", style = MaterialTheme.typography.bodyMedium)
+            } else {
+                val currentCard = flashcards[currentIndex % flashcards.size]
+                if (showAnswer) {
+                    Text("A: ${currentCard.answer}", style = MaterialTheme.typography.titleMedium)
+                } else {
+                    Text("Q: ${currentCard.question}", style = MaterialTheme.typography.titleMedium)
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
-                Text("Close")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Button(onClick = onClose) {
+                    Text("Close")
+                }
+                if (flashcards.isNotEmpty()) {
+                    Button(onClick = {
+                        currentIndex++
+                        showAnswer = false
+                    }) {
+                        Text("Next")
+                    }
+                }
             }
         }
     }
