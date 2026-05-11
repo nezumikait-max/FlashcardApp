@@ -1,8 +1,8 @@
 package com.example.flashcardapp
 
-import android.os.Bundle
 import android.content.Intent
 import android.net.Uri
+import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,10 +11,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -46,14 +51,12 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
     val flashcards by viewModel.flashcards.collectAsState()
     val context = LocalContext.current
 
+    var questionText by remember { mutableStateOf("") }
+    var answerText by remember { mutableStateOf("") }
+
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Flashcards") })
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.addDummyFlashcard() }) {
-                Icon(Icons.Filled.Add, contentDescription = "Add Flashcard")
-            }
+            TopAppBar(title = { Text("Flashcards Dashboard") })
         }
     ) { padding ->
         Column(
@@ -61,10 +64,11 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Permission and Launch Buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 Button(onClick = {
@@ -73,32 +77,56 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
                         context.startActivity(intent)
                     }
                 }) {
-                    Text("Grant Overlay Permission")
+                    Text("Grant Overlay")
                 }
-            }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
                 Button(onClick = {
                     if (Settings.canDrawOverlays(context)) {
                         context.startService(Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java))
                     }
                 }) {
-                    Text("Launch Floating Flashcard")
+                    Text("Launch Floating UI")
                 }
             }
 
+            // Input Form
+            Column(modifier = Modifier.padding(16.dp)) {
+                OutlinedTextField(
+                    value = questionText,
+                    onValueChange = { questionText = it },
+                    label = { Text("Question") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = answerText,
+                    onValueChange = { answerText = it },
+                    label = { Text("Answer") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        if (questionText.isNotBlank() && answerText.isNotBlank()) {
+                            viewModel.insertFlashcard(questionText, answerText)
+                            questionText = ""
+                            answerText = ""
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Save Flashcard")
+                }
+            }
+
+            // Flashcard List
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(flashcards) { flashcard ->
-                    FlashcardItem(flashcard)
+                    FlashcardItem(flashcard, onDelete = { viewModel.deleteFlashcard(flashcard) })
                 }
             }
         }
@@ -106,12 +134,23 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
 }
 
 @Composable
-fun FlashcardItem(flashcard: Flashcard) {
+fun FlashcardItem(flashcard: Flashcard, onDelete: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "Q: ${flashcard.question}", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(text = "A: ${flashcard.answer}", style = MaterialTheme.typography.bodyMedium)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Q: ${flashcard.question}", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = "A: ${flashcard.answer}", style = MaterialTheme.typography.bodyMedium)
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = "Delete Flashcard", tint = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }
