@@ -1,6 +1,9 @@
 package com.example.flashcardapp
 
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -13,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.flashcardapp.data.Flashcard
@@ -40,6 +44,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
     val flashcards by viewModel.flashcards.collectAsState()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -51,15 +56,50 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
             }
         }
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(padding)
         ) {
-            items(flashcards) { flashcard ->
-                FlashcardItem(flashcard)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Button(onClick = {
+                    if (!Settings.canDrawOverlays(context)) {
+                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
+                        context.startActivity(intent)
+                    }
+                }) {
+                    Text("Grant Overlay Permission")
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Button(onClick = {
+                    if (Settings.canDrawOverlays(context)) {
+                        context.startService(Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java))
+                    }
+                }) {
+                    Text("Launch Floating Flashcard")
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(flashcards) { flashcard ->
+                    FlashcardItem(flashcard)
+                }
             }
         }
     }
