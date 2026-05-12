@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
@@ -216,13 +217,27 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                 Tab(
                     selected = selectedCategory == null,
                     onClick = { viewModel.setSelectedCategory(null) },
-                    text = { Text("All") }
+                    text = { 
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("All")
+                            if (selectedCategory == null) {
+                                Badge(modifier = Modifier.padding(start = 4.dp)) { Text("${flashcards.size}") }
+                            }
+                        }
+                    }
                 )
                 categories.forEach { category ->
                     Tab(
                         selected = selectedCategory == category,
                         onClick = { viewModel.setSelectedCategory(category) },
-                        text = { Text(category) }
+                        text = { 
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(category)
+                                if (selectedCategory == category) {
+                                    Badge(modifier = Modifier.padding(start = 4.dp)) { Text("${flashcards.size}") }
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -289,6 +304,7 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
     val flashcards by viewModel.flashcards.collectAsState()
     var currentIndex by remember { mutableStateOf(0) }
     var rotated by remember { mutableStateOf(false) }
+    var isFinished by remember { mutableStateOf(false) }
 
     val rotation by animateFloatAsState(
         targetValue = if (rotated) 180f else 0f,
@@ -302,7 +318,7 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Study Mode") },
+                title = { Text(if (isFinished) "Study Complete" else "Study Mode") },
                 navigationIcon = {
                     IconButton(onClick = onExit) {
                         Icon(Icons.Filled.Close, contentDescription = "Exit Study Mode")
@@ -314,6 +330,34 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
         if (shuffledCards.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("No flashcards to study!")
+            }
+        } else if (isFinished) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    Icons.Filled.CheckCircle, 
+                    contentDescription = null, 
+                    modifier = Modifier.size(100.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Deck Finished!", style = MaterialTheme.typography.headlineMedium)
+                Text("You've reviewed ${shuffledCards.size} cards.", style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(onClick = {
+                    currentIndex = 0
+                    rotated = false
+                    isFinished = false
+                }) {
+                    Text("Study Again")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(onClick = onExit) {
+                    Text("Back to Dashboard")
+                }
             }
         } else {
             val currentCard = shuffledCards[currentIndex]
@@ -332,46 +376,61 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                        .graphicsLayer {
-                            rotationY = rotation
-                            cameraDistance = 12f * density
-                        }
-                        .clickable { rotated = !rotated },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (rotation <= 90f) {
-                        Card(
-                            modifier = Modifier.fillMaxSize(),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                        ) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = currentCard.question,
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(24.dp)
-                                )
+                AnimatedContent(
+                    targetState = currentIndex,
+                    transitionSpec = {
+                        if (targetState > initialState) {
+                            slideInHorizontally { it } + fadeIn() togetherWith
+                                    slideOutHorizontally { -it } + fadeOut()
+                        } else {
+                            slideInHorizontally { -it } + fadeIn() togetherWith
+                                    slideOutHorizontally { it } + fadeOut()
+                        }.using(SizeTransform(clip = false))
+                    },
+                    label = "Card Transition"
+                ) { targetIndex ->
+                    val card = shuffledCards[targetIndex]
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                            .graphicsLayer {
+                                rotationY = rotation
+                                cameraDistance = 12f * density
                             }
-                        }
-                    } else {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer { rotationY = 180f },
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                        ) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = currentCard.answer,
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(24.dp)
-                                )
+                            .clickable { rotated = !rotated },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (rotation <= 90f) {
+                            Card(
+                                modifier = Modifier.fillMaxSize(),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                            ) {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = card.question,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(24.dp)
+                                    )
+                                }
+                            }
+                        } else {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { rotationY = 180f },
+                                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                            ) {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = card.answer,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(24.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -413,11 +472,15 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
                             if (currentIndex < shuffledCards.size - 1) {
                                 currentIndex++
                                 rotated = false
+                            } else {
+                                isFinished = true
                             }
-                        },
-                        enabled = currentIndex < shuffledCards.size - 1
+                        }
                     ) {
-                        Icon(Icons.Filled.ArrowForward, contentDescription = "Next Card")
+                        Icon(
+                            if (currentIndex < shuffledCards.size - 1) Icons.Filled.ArrowForward else Icons.Filled.Check, 
+                            contentDescription = if (currentIndex < shuffledCards.size - 1) "Next Card" else "Finish"
+                        )
                     }
                 }
             }
