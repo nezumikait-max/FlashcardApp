@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.flashcardapp.data.Flashcard
 import com.example.flashcardapp.repository.FlashcardRepository
+import com.example.flashcardapp.repository.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -15,17 +15,22 @@ import javax.inject.Inject
 
 @HiltViewModel
 class FlashcardViewModel @Inject constructor(
-    private val repository: FlashcardRepository
+    private val repository: FlashcardRepository,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
-    private val _selectedCategory = MutableStateFlow<String?>(null)
-    val selectedCategory: StateFlow<String?> = _selectedCategory
+    val selectedCategory: StateFlow<String?> = userPreferencesRepository.selectedCategoryFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
 
     val categories: StateFlow<List<String>> = repository.getCategories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val flashcards: StateFlow<List<Flashcard>> = repository.getAllFlashcards()
-        .combine(_selectedCategory) { cards, category ->
+        .combine(selectedCategory) { cards, category ->
             if (category == null) cards else cards.filter { it.category == category }
         }
         .stateIn(
@@ -35,7 +40,9 @@ class FlashcardViewModel @Inject constructor(
         )
 
     fun setSelectedCategory(category: String?) {
-        _selectedCategory.value = category
+        viewModelScope.launch {
+            userPreferencesRepository.saveSelectedCategory(category)
+        }
     }
 
     fun insertFlashcard(question: String, answer: String, category: String = "General") {

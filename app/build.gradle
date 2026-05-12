@@ -50,6 +50,7 @@ dependencies {
     implementation libs.activity.compose
     implementation libs.lifecycle.viewmodel.compose
     implementation libs.lifecycle.service
+    implementation libs.datastore.preferences
 
     testImplementation libs.junit
     testImplementation libs.kotlinx.coroutines.test

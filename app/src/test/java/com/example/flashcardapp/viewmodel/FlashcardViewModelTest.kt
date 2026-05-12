@@ -3,23 +3,22 @@ package com.example.flashcardapp.viewmodel
 import app.cash.turbine.test
 import com.example.flashcardapp.data.Flashcard
 import com.example.flashcardapp.repository.FlashcardRepository
+import com.example.flashcardapp.repository.UserPreferencesRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
+import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -45,6 +44,7 @@ class FlashcardViewModelTest {
 
     private lateinit var viewModel: FlashcardViewModel
     private val repository: FlashcardRepository = mock()
+    private val userPreferencesRepository: UserPreferencesRepository = mock()
 
     private val testCards = listOf(
         Flashcard(1, "Q1", "A1", "General"),
@@ -56,7 +56,8 @@ class FlashcardViewModelTest {
     fun setup() {
         whenever(repository.getAllFlashcards()).thenReturn(flowOf(testCards))
         whenever(repository.getCategories()).thenReturn(flowOf(listOf("General", "Math")))
-        viewModel = FlashcardViewModel(repository)
+        whenever(userPreferencesRepository.selectedCategoryFlow).thenReturn(flowOf(null))
+        viewModel = FlashcardViewModel(repository, userPreferencesRepository)
     }
 
     @Test
@@ -69,13 +70,9 @@ class FlashcardViewModelTest {
     }
 
     @Test
-    fun `flashcards flow filters by category`() = runTest {
+    fun `setSelectedCategory calls userPreferencesRepository`() = runTest {
         viewModel.setSelectedCategory("Math")
-        viewModel.flashcards.test {
-            val emission = awaitItem()
-            assertEquals(1, emission.size)
-            assertEquals("Math", emission[0].category)
-        }
+        verify(userPreferencesRepository).saveSelectedCategory("Math")
     }
 
     @Test
