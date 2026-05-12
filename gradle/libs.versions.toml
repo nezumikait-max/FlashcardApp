@@ -2,9 +2,10 @@
 agp = "8.1.0"
 kotlin = "1.9.22"
 ksp = "1.9.22-1.0.17"
-room = "2.5.2"
+room = "2.6.1"
 hilt = "2.48.1"
 compose-bom = "2024.02.00"
+composeCompiler = "1.5.8"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
