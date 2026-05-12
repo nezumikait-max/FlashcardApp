@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -53,6 +54,7 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
 
     var questionText by remember { mutableStateOf("") }
     var answerText by remember { mutableStateOf("") }
+    var editingFlashcard by remember { mutableStateOf<Flashcard?>(null) }
 
     Scaffold(
         topBar = {
@@ -105,17 +107,37 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        if (questionText.isNotBlank() && answerText.isNotBlank()) {
-                            viewModel.insertFlashcard(questionText, answerText)
-                            questionText = ""
-                            answerText = ""
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = {
+                            if (questionText.isNotBlank() && answerText.isNotBlank()) {
+                                if (editingFlashcard == null) {
+                                    viewModel.insertFlashcard(questionText, answerText)
+                                } else {
+                                    viewModel.updateFlashcard(editingFlashcard!!.copy(question = questionText, answer = answerText))
+                                    editingFlashcard = null
+                                }
+                                questionText = ""
+                                answerText = ""
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (editingFlashcard == null) "Save Flashcard" else "Update Flashcard")
+                    }
+                    if (editingFlashcard != null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                editingFlashcard = null
+                                questionText = ""
+                                answerText = ""
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Cancel")
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Save Flashcard")
+                    }
                 }
             }
 
@@ -126,7 +148,15 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(flashcards) { flashcard ->
-                    FlashcardItem(flashcard, onDelete = { viewModel.deleteFlashcard(flashcard) })
+                    FlashcardItem(
+                        flashcard,
+                        onDelete = { viewModel.deleteFlashcard(flashcard) },
+                        onEdit = {
+                            editingFlashcard = flashcard
+                            questionText = flashcard.question
+                            answerText = flashcard.answer
+                        }
+                    )
                 }
             }
         }
@@ -134,7 +164,7 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
 }
 
 @Composable
-fun FlashcardItem(flashcard: Flashcard, onDelete: () -> Unit) {
+fun FlashcardItem(flashcard: Flashcard, onDelete: () -> Unit, onEdit: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -148,8 +178,13 @@ fun FlashcardItem(flashcard: Flashcard, onDelete: () -> Unit) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(text = "A: ${flashcard.answer}", style = MaterialTheme.typography.bodyMedium)
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete Flashcard", tint = MaterialTheme.colorScheme.error)
+            Row {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit Flashcard", tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete Flashcard", tint = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }

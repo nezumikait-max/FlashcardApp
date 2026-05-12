@@ -40,6 +40,12 @@ class FlashcardViewModel @Inject constructor(
         }
     }
 
+    fun updateFlashcard(flashcard: Flashcard) {
+        viewModelScope.launch {
+            repository.insertFlashcard(flashcard)
+        }
+    }
+
     fun deleteFlashcard(flashcard: Flashcard) {
         viewModelScope.launch {
             repository.deleteFlashcard(flashcard)
