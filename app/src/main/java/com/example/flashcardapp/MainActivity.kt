@@ -6,40 +6,54 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.flashcardapp.data.Flashcard
 import com.example.flashcardapp.viewmodel.FlashcardViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
+enum class AppScreen {
+    Dashboard,
+    Study
+}
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            var currentScreen by remember { mutableStateOf(AppScreen.Dashboard) }
+
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    FlashcardScreen()
+                    when (currentScreen) {
+                        AppScreen.Dashboard -> FlashcardScreen(
+                            onStartStudy = { currentScreen = AppScreen.Study }
+                        )
+                        AppScreen.Study -> StudyScreen(
+                            onExit = { currentScreen = AppScreen.Dashboard }
+                        )
+                    }
                 }
             }
         }
@@ -48,7 +62,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
+fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: () -> Unit) {
     val flashcards by viewModel.flashcards.collectAsState()
     val context = LocalContext.current
 
@@ -88,6 +102,14 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel()) {
                     }
                 }) {
                     Text("Launch Floating UI")
+                }
+
+                Button(
+                    onClick = onStartStudy,
+                    enabled = flashcards.isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) {
+                    Text("Study Mode")
                 }
             }
 
@@ -184,6 +206,109 @@ fun FlashcardItem(flashcard: Flashcard, onDelete: () -> Unit, onEdit: () -> Unit
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = "Delete Flashcard", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit) {
+    val flashcards by viewModel.flashcards.collectAsState()
+    var currentIndex by remember { mutableStateOf(0) }
+    var showAnswer by remember { mutableStateOf(false) }
+
+    // Shuffle cards once when the screen is entered
+    val shuffledCards = remember(flashcards) { flashcards.shuffled() }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Study Mode") },
+                navigationIcon = {
+                    IconButton(onClick = onExit) {
+                        Icon(Icons.Filled.Close, contentDescription = "Exit Study Mode")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        if (shuffledCards.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Text("No flashcards to study!")
+            }
+        } else {
+            val currentCard = shuffledCards[currentIndex]
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Card ${currentIndex + 1} of ${shuffledCards.size}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp)
+                        .clickable { showAnswer = !showAnswer },
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize().padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (showAnswer) currentCard.answer else currentCard.question,
+                            style = MaterialTheme.typography.headlineMedium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (showAnswer) "Answer (Tap to hide)" else "Question (Tap to reveal)",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    IconButton(
+                        onClick = {
+                            if (currentIndex > 0) {
+                                currentIndex--
+                                showAnswer = false
+                            }
+                        },
+                        enabled = currentIndex > 0
+                    ) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Previous Card")
+                    }
+                    
+                    IconButton(
+                        onClick = {
+                            if (currentIndex < shuffledCards.size - 1) {
+                                currentIndex++
+                                showAnswer = false
+                            }
+                        },
+                        enabled = currentIndex < shuffledCards.size - 1
+                    ) {
+                        Icon(Icons.Filled.ArrowForward, contentDescription = "Next Card")
+                    }
                 }
             }
         }
