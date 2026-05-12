@@ -65,14 +65,14 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         composeView = ComposeView(this).apply {
             setContent {
                 MaterialTheme {
-                    val flashcardsFlow = remember {
-                        repository.getAllFlashcards().combine(userPreferencesRepository.selectedCategoryFlow) { cards, category ->
-                            if (category == null) cards else cards.filter { it.category == category }
-                        }
-                    }
-                    val flashcards by flashcardsFlow.collectAsState(initial = emptyList())
+                    val allFlashcards by repository.getAllFlashcards().collectAsState(initial = emptyList())
+                    val selectedCategory by userPreferencesRepository.selectedCategoryFlow.collectAsState(initial = null)
                     
-                    FloatingCard(flashcards = flashcards, onClose = { stopSelf() })
+                    val filteredFlashcards = remember(allFlashcards, selectedCategory) {
+                        if (selectedCategory == null) allFlashcards else allFlashcards.filter { it.category == selectedCategory }
+                    }
+                    
+                    FloatingCard(flashcards = filteredFlashcards, onClose = { stopSelf() })
                 }
             }
         }

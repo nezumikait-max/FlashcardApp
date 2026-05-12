@@ -30,5 +30,6 @@ lifecycle-service = { group = "androidx.lifecycle", name = "lifecycle-service", 
 junit = { group = "junit", name = "junit", version = "4.13.2" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version = "1.7.3" }
 mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version = "5.2.1" }
+mockito-inline = { group = "org.mockito", name = "mockito-inline", version = "5.2.0" }
 turbine = { group = "app.cash.turbine", name = "turbine", version = "1.0.0" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version = "1.0.0" }
