@@ -76,6 +76,27 @@ class FlashcardViewModelTest {
     }
 
     @Test
+    fun `flashcards flow filters by search query`() = runTest {
+        viewModel.setSearchQuery("A2")
+        viewModel.flashcards.test {
+            val emission = awaitItem()
+            assertEquals(1, emission.size)
+            assertEquals("Q2", emission[0].question)
+        }
+    }
+
+    @Test
+    fun `flashcards flow filters by both category and search query`() = runTest {
+        viewModel.setSelectedCategory("General")
+        viewModel.setSearchQuery("Q3")
+        viewModel.flashcards.test {
+            val emission = awaitItem()
+            assertEquals(1, emission.size)
+            assertEquals("Q3", emission[0].question)
+        }
+    }
+
+    @Test
     fun `insertFlashcard calls repository`() = runTest {
         viewModel.insertFlashcard("New Q", "New A", "Science")
         verify(repository).insertFlashcard(Flashcard(question = "New Q", answer = "New A", category = "Science"))
