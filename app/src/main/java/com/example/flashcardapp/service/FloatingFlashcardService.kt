@@ -8,12 +8,7 @@ import android.view.WindowManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
@@ -28,7 +23,9 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.example.flashcardapp.data.Flashcard
 import com.example.flashcardapp.repository.FlashcardRepository
+import com.example.flashcardapp.repository.UserPreferencesRepository
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -36,6 +33,9 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
 
     @Inject
     lateinit var repository: FlashcardRepository
+
+    @Inject
+    lateinit var userPreferencesRepository: UserPreferencesRepository
 
     private lateinit var windowManager: WindowManager
     private lateinit var composeView: ComposeView
@@ -65,7 +65,13 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         composeView = ComposeView(this).apply {
             setContent {
                 MaterialTheme {
-                    val flashcards by repository.getAllFlashcards().collectAsState(initial = emptyList())
+                    val flashcardsFlow = remember {
+                        repository.getAllFlashcards().combine(userPreferencesRepository.selectedCategoryFlow) { cards, category ->
+                            if (category == null) cards else cards.filter { it.category == category }
+                        }
+                    }
+                    val flashcards by flashcardsFlow.collectAsState(initial = emptyList())
+                    
                     FloatingCard(flashcards = flashcards, onClose = { stopSelf() })
                 }
             }
@@ -93,6 +99,12 @@ fun FloatingCard(flashcards: List<Flashcard>, onClose: () -> Unit) {
     var currentIndex by remember { mutableStateOf(0) }
     var showAnswer by remember { mutableStateOf(false) }
 
+    // Reset index if cards change significantly (e.g. filter change)
+    LaunchedEffect(flashcards.size) {
+        currentIndex = 0
+        showAnswer = false
+    }
+
     Card(
         modifier = Modifier
             .padding(16.dp)
@@ -106,7 +118,7 @@ fun FloatingCard(flashcards: List<Flashcard>, onClose: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             if (flashcards.isEmpty()) {
-                Text("No cards available. Add some in the app!", style = MaterialTheme.typography.bodyMedium)
+                Text("No cards available in this category.", style = MaterialTheme.typography.bodyMedium)
             } else {
                 val currentCard = flashcards[currentIndex % flashcards.size]
                 if (showAnswer) {

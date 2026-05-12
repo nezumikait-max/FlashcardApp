@@ -14,6 +14,6 @@ This directory contains services that manage the floating overlay UI for the Fla
 - **Compose UI**: The floating UI should be lightweight. Keep the `FloatingCard` composable simple and performant.
 
 ## Adding New Features to Overlay
-1.  **State**: Pass necessary state through the `setContent` block in the service.
+1.  **State**: Pass necessary state through the `setContent` block in the service. The overlay now respects the user's selected category from `UserPreferencesRepository`.
 2.  **Interactivity**: Remember that the window is currently set to `FLAG_NOT_FOCUSABLE`. If input (like typing) is needed, the flags must be adjusted dynamically.
-3.  **Hilt**: The service is annotated with `@AndroidEntryPoint`, allowing injection of repositories and other dependencies.
+3.  **Hilt**: The service is annotated with `@AndroidEntryPoint`, allowing injection of repositories (including `UserPreferencesRepository`) and other dependencies.
