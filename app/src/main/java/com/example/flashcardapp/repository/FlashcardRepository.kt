@@ -12,6 +12,11 @@ class FlashcardRepository @Inject constructor(
 ) {
     fun getAllFlashcards(): Flow<List<Flashcard>> = flashcardDao.getAllFlashcards()
 
+    fun getCategories(): Flow<List<String>> = flashcardDao.getCategories()
+
+    fun getFlashcardsByCategory(category: String): Flow<List<Flashcard>> = 
+        flashcardDao.getFlashcardsByCategory(category)
+
     suspend fun insertFlashcard(flashcard: Flashcard) {
         flashcardDao.insertFlashcard(flashcard)
     }

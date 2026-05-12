@@ -68,6 +68,7 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
 
     var questionText by remember { mutableStateOf("") }
     var answerText by remember { mutableStateOf("") }
+    var categoryText by remember { mutableStateOf("General") }
     var editingFlashcard by remember { mutableStateOf<Flashcard?>(null) }
 
     Scaffold(
@@ -129,18 +130,26 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = categoryText,
+                    onValueChange = { categoryText = it },
+                    label = { Text("Category") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = {
                             if (questionText.isNotBlank() && answerText.isNotBlank()) {
                                 if (editingFlashcard == null) {
-                                    viewModel.insertFlashcard(questionText, answerText)
+                                    viewModel.insertFlashcard(questionText, answerText, categoryText)
                                 } else {
-                                    viewModel.updateFlashcard(editingFlashcard!!.copy(question = questionText, answer = answerText))
+                                    viewModel.updateFlashcard(editingFlashcard!!.copy(question = questionText, answer = answerText, category = categoryText))
                                     editingFlashcard = null
                                 }
                                 questionText = ""
                                 answerText = ""
+                                categoryText = "General"
                             }
                         },
                         modifier = Modifier.weight(1f)
@@ -154,12 +163,37 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                                 editingFlashcard = null
                                 questionText = ""
                                 answerText = ""
+                                categoryText = "General"
                             },
                             modifier = Modifier.weight(1f)
                         ) {
                             Text("Cancel")
                         }
                     }
+                }
+            }
+
+            // Category Filter
+            val categories by viewModel.categories.collectAsState()
+            val selectedCategory by viewModel.selectedCategory.collectAsState()
+
+            ScrollableTabRow(
+                selectedTabIndex = if (selectedCategory == null) 0 else categories.indexOf(selectedCategory) + 1,
+                edgePadding = 16.dp,
+                modifier = Modifier.fillMaxWidth(),
+                divider = {}
+            ) {
+                Tab(
+                    selected = selectedCategory == null,
+                    onClick = { viewModel.setSelectedCategory(null) },
+                    text = { Text("All") }
+                )
+                categories.forEach { category ->
+                    Tab(
+                        selected = selectedCategory == category,
+                        onClick = { viewModel.setSelectedCategory(category) },
+                        text = { Text(category) }
+                    )
                 }
             }
 
@@ -177,6 +211,7 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                             editingFlashcard = flashcard
                             questionText = flashcard.question
                             answerText = flashcard.answer
+                            categoryText = flashcard.category
                         }
                     )
                 }
@@ -185,6 +220,7 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FlashcardItem(flashcard: Flashcard, onDelete: () -> Unit, onEdit: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -199,6 +235,11 @@ fun FlashcardItem(flashcard: Flashcard, onDelete: () -> Unit, onEdit: () -> Unit
                 Text(text = "Q: ${flashcard.question}", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(text = "A: ${flashcard.answer}", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(4.dp))
+                SuggestionChip(
+                    onClick = { },
+                    label = { Text(flashcard.category, style = MaterialTheme.typography.labelSmall) }
+                )
             }
             Row {
                 IconButton(onClick = onEdit) {

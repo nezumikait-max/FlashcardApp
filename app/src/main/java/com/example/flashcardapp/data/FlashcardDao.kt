@@ -12,6 +12,12 @@ interface FlashcardDao {
     @Query("SELECT * FROM flashcards")
     fun getAllFlashcards(): Flow<List<Flashcard>>
 
+    @Query("SELECT DISTINCT category FROM flashcards")
+    fun getCategories(): Flow<List<String>>
+
+    @Query("SELECT * FROM flashcards WHERE category = :category")
+    fun getFlashcardsByCategory(category: String): Flow<List<Flashcard>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFlashcard(flashcard: Flashcard)
 
