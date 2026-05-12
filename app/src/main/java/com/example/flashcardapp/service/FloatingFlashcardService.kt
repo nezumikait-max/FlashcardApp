@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,7 +26,6 @@ import com.example.flashcardapp.data.Flashcard
 import com.example.flashcardapp.repository.FlashcardRepository
 import com.example.flashcardapp.repository.UserPreferencesRepository
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -59,7 +59,9 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.CENTER
+            gravity = Gravity.TOP or Gravity.START
+            x = 100
+            y = 100
         }
 
         composeView = ComposeView(this).apply {
@@ -74,6 +76,31 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                     
                     FloatingCard(flashcards = filteredFlashcards, onClose = { stopSelf() })
                 }
+            }
+        }
+
+        // Draggable Logic
+        var initialX = 0
+        var initialY = 0
+        var initialTouchX = 0f
+        var initialTouchY = 0f
+
+        composeView.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = params.x
+                    initialY = params.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    params.x = initialX + (event.rawX - initialTouchX).toInt()
+                    params.y = initialY + (event.rawY - initialTouchY).toInt()
+                    windowManager.updateViewLayout(composeView, params)
+                    true
+                }
+                else -> false
             }
         }
 
@@ -99,7 +126,6 @@ fun FloatingCard(flashcards: List<Flashcard>, onClose: () -> Unit) {
     var currentIndex by remember { mutableStateOf(0) }
     var showAnswer by remember { mutableStateOf(false) }
 
-    // Reset index if cards change significantly (e.g. filter change)
     LaunchedEffect(flashcards.size) {
         currentIndex = 0
         showAnswer = false
