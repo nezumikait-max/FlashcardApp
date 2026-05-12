@@ -6,21 +6,19 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -64,6 +62,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: () -> Unit) {
     val flashcards by viewModel.flashcards.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
     val context = LocalContext.current
 
     var questionText by remember { mutableStateOf("") }
@@ -114,60 +113,91 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                 }
             }
 
-            // Input Form
-            Column(modifier = Modifier.padding(16.dp)) {
-                OutlinedTextField(
-                    value = questionText,
-                    onValueChange = { questionText = it },
-                    label = { Text("Question") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = answerText,
-                    onValueChange = { answerText = it },
-                    label = { Text("Answer") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = categoryText,
-                    onValueChange = { categoryText = it },
-                    label = { Text("Category") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = {
-                            if (questionText.isNotBlank() && answerText.isNotBlank()) {
-                                if (editingFlashcard == null) {
-                                    viewModel.insertFlashcard(questionText, answerText, categoryText)
-                                } else {
-                                    viewModel.updateFlashcard(editingFlashcard!!.copy(question = questionText, answer = answerText, category = categoryText))
-                                    editingFlashcard = null
-                                }
-                                questionText = ""
-                                answerText = ""
-                                categoryText = "General"
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (editingFlashcard == null) "Save Flashcard" else "Update Flashcard")
+            // Search Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { viewModel.setSearchQuery(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text("Search flashcards...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                        }
                     }
-                    if (editingFlashcard != null) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        OutlinedButton(
+                },
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium
+            )
+
+            // Input Form
+            Card(
+                modifier = Modifier.padding(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = if (editingFlashcard == null) "Add New Flashcard" else "Edit Flashcard",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = questionText,
+                        onValueChange = { questionText = it },
+                        label = { Text("Question") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = answerText,
+                        onValueChange = { answerText = it },
+                        label = { Text("Answer") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = categoryText,
+                        onValueChange = { categoryText = it },
+                        label = { Text("Category") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Button(
                             onClick = {
-                                editingFlashcard = null
-                                questionText = ""
-                                answerText = ""
-                                categoryText = "General"
+                                if (questionText.isNotBlank() && answerText.isNotBlank()) {
+                                    if (editingFlashcard == null) {
+                                        viewModel.insertFlashcard(questionText, answerText, categoryText)
+                                    } else {
+                                        viewModel.updateFlashcard(editingFlashcard!!.copy(question = questionText, answer = answerText, category = categoryText))
+                                        editingFlashcard = null
+                                    }
+                                    questionText = ""
+                                    answerText = ""
+                                    categoryText = "General"
+                                }
                             },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Cancel")
+                            Text(if (editingFlashcard == null) "Save Flashcard" else "Update Flashcard")
+                        }
+                        if (editingFlashcard != null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    editingFlashcard = null
+                                    questionText = ""
+                                    answerText = ""
+                                    categoryText = "General"
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Cancel")
+                            }
                         }
                     }
                 }
@@ -258,7 +288,13 @@ fun FlashcardItem(flashcard: Flashcard, onDelete: () -> Unit, onEdit: () -> Unit
 fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit) {
     val flashcards by viewModel.flashcards.collectAsState()
     var currentIndex by remember { mutableStateOf(0) }
-    var showAnswer by remember { mutableStateOf(false) }
+    var rotated by remember { mutableStateOf(false) }
+
+    val rotation by animateFloatAsState(
+        targetValue = if (rotated) 180f else 0f,
+        animationSpec = tween(durationMillis = 400),
+        label = "Card Rotation"
+    )
 
     // Shuffle cards once when the screen is entered
     val shuffledCards = remember(flashcards) { flashcards.shuffled() }
@@ -296,42 +332,70 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                Card(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(300.dp)
-                        .clickable { showAnswer = !showAnswer },
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                        .graphicsLayer {
+                            rotationY = rotation
+                            cameraDistance = 12f * density
+                        }
+                        .clickable { rotated = !rotated },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (showAnswer) currentCard.answer else currentCard.question,
-                            style = MaterialTheme.typography.headlineMedium,
-                            textAlign = TextAlign.Center
-                        )
+                    if (rotation <= 90f) {
+                        Card(
+                            modifier = Modifier.fillMaxSize(),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = currentCard.question,
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(24.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { rotationY = 180f },
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = currentCard.answer,
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(24.dp)
+                                )
+                            }
+                        }
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = if (showAnswer) "Answer (Tap to hide)" else "Question (Tap to reveal)",
-                    style = MaterialTheme.typography.bodySmall
+                    text = "Tap to flip",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
                 Spacer(modifier = Modifier.height(32.dp))
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
+                    FilledTonalIconButton(
                         onClick = {
                             if (currentIndex > 0) {
                                 currentIndex--
-                                showAnswer = false
+                                rotated = false
                             }
                         },
                         enabled = currentIndex > 0
@@ -339,11 +403,16 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Previous Card")
                     }
                     
-                    IconButton(
+                    Text(
+                        text = "${currentIndex + 1} / ${shuffledCards.size}",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    FilledTonalIconButton(
                         onClick = {
                             if (currentIndex < shuffledCards.size - 1) {
                                 currentIndex++
-                                showAnswer = false
+                                rotated = false
                             }
                         },
                         enabled = currentIndex < shuffledCards.size - 1
