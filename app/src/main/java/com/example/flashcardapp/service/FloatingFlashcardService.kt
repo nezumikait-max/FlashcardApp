@@ -5,6 +5,7 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -85,24 +86,31 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         var initialTouchX = 0f
         var initialTouchY = 0f
 
-        composeView.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    true
+        composeView.setOnTouchListener(object : View.OnTouchListener {
+            override fun onTouch(v: View?, event: MotionEvent?): Boolean {
+                if (event == null) return false
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        initialX = params.x
+                        initialY = params.y
+                        initialTouchX = event.rawX
+                        initialTouchY = event.rawY
+                        return true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        params.x = initialX + (event.rawX - initialTouchX).toInt()
+                        params.y = initialY + (event.rawY - initialTouchY).toInt()
+                        windowManager.updateViewLayout(composeView, params)
+                        return true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v?.performClick()
+                        return true
+                    }
+                    else -> return false
                 }
-                MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    windowManager.updateViewLayout(composeView, params)
-                    true
-                }
-                else -> false
             }
-        }
+        })
 
         ViewTreeLifecycleOwner.set(composeView, this)
         composeView.setViewTreeSavedStateRegistryOwner(this)
