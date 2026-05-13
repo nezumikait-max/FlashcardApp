@@ -312,7 +312,6 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
         label = "Card Rotation"
     )
 
-    // Shuffle cards once when the screen is entered
     val shuffledCards = remember(flashcards) { flashcards.shuffled() }
 
     Scaffold(
@@ -379,13 +378,14 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
                 AnimatedContent(
                     targetState = currentIndex,
                     transitionSpec = {
-                        if (targetState > initialState) {
-                            slideInHorizontally { it } + fadeIn() togetherWith
-                                    slideOutHorizontally { -it } + fadeOut()
+                        val transform = if (targetState > initialState) {
+                            slideInHorizontally { width -> width } + fadeIn() togetherWith
+                                    slideOutHorizontally { width -> -width } + fadeOut()
                         } else {
-                            slideInHorizontally { -it } + fadeIn() togetherWith
-                                    slideOutHorizontally { it } + fadeOut()
-                        }.using(SizeTransform(clip = false))
+                            slideInHorizontally { width -> -width } + fadeIn() togetherWith
+                                    slideOutHorizontally { width -> width } + fadeOut()
+                        }
+                        transform.using(SizeTransform(clip = false))
                     },
                     label = "Card Transition"
                 ) { targetIndex ->

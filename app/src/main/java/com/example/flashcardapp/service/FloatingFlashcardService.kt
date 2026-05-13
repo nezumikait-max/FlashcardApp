@@ -80,37 +80,34 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
             }
         }
 
-        // Draggable Logic
-        var initialX = 0
-        var initialY = 0
+        // Draggable Logic using a simpler approach to avoid capture issues
+        var initialX = 100
+        var initialY = 100
         var initialTouchX = 0f
         var initialTouchY = 0f
 
-        composeView.setOnTouchListener(object : View.OnTouchListener {
-            override fun onTouch(v: View?, event: MotionEvent?): Boolean {
-                if (event == null) return false
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        initialX = params.x
-                        initialY = params.y
-                        initialTouchX = event.rawX
-                        initialTouchY = event.rawY
-                        return true
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        params.x = initialX + (event.rawX - initialTouchX).toInt()
-                        params.y = initialY + (event.rawY - initialTouchY).toInt()
-                        windowManager.updateViewLayout(composeView, params)
-                        return true
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        v?.performClick()
-                        return true
-                    }
-                    else -> return false
+        composeView.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = params.x
+                    initialY = params.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    true
                 }
+                MotionEvent.ACTION_MOVE -> {
+                    params.x = initialX + (event.rawX - initialTouchX).toInt()
+                    params.y = initialY + (event.rawY - initialTouchY).toInt()
+                    windowManager.updateViewLayout(composeView, params)
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    composeView.performClick()
+                    true
+                }
+                else -> false
             }
-        })
+        }
 
         ViewTreeLifecycleOwner.set(composeView, this)
         composeView.setViewTreeSavedStateRegistryOwner(this)
