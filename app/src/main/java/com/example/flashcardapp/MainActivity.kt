@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -272,15 +273,66 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(flashcards) { flashcard ->
-                    FlashcardItem(
-                        flashcard,
-                        onDelete = { viewModel.deleteFlashcard(flashcard) },
-                        onEdit = {
-                            editingFlashcard = flashcard
-                            questionText = flashcard.question
-                            answerText = flashcard.answer
-                            categoryText = flashcard.category
+                items(
+                    items = flashcards,
+                    key = { it.id }
+                ) { flashcard ->
+                    val dismissState = rememberDismissState(
+                        confirmValueChange = {
+                            if (it == DismissValue.DismissedToEnd || it == DismissValue.DismissedToStart) {
+                                viewModel.deleteFlashcard(flashcard)
+                                true
+                            } else false
+                        }
+                    )
+
+                    SwipeToDismiss(
+                        state = dismissState,
+                        background = {
+                            val direction = dismissState.dismissDirection ?: return@SwipeToDismiss
+                            val color by animateColorAsState(
+                                when (dismissState.targetValue) {
+                                    DismissValue.Default -> Color.Transparent
+                                    else -> MaterialTheme.colorScheme.errorContainer
+                                },
+                                label = "Dismiss Color"
+                            )
+                            val alignment = when (direction) {
+                                DismissDirection.StartToEnd -> Alignment.CenterStart
+                                DismissDirection.EndToStart -> Alignment.CenterEnd
+                            }
+                            val icon = Icons.Default.Delete
+                            val scale by animateFloatAsState(
+                                if (dismissState.targetValue == DismissValue.Default) 0.75f else 1f,
+                                label = "Dismiss Icon Scale"
+                            )
+
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .background(color)
+                                    .padding(horizontal = 20.dp),
+                                contentAlignment = alignment
+                            ) {
+                                Icon(
+                                    icon,
+                                    contentDescription = "Delete Icon",
+                                    modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        },
+                        dismissContent = {
+                            FlashcardItem(
+                                flashcard,
+                                onDelete = { viewModel.deleteFlashcard(flashcard) },
+                                onEdit = {
+                                    editingFlashcard = flashcard
+                                    questionText = flashcard.question
+                                    answerText = flashcard.answer
+                                    categoryText = flashcard.category
+                                }
+                            )
                         }
                     )
                 }
@@ -315,7 +367,7 @@ fun FlashcardItem(flashcard: Flashcard, onDelete: () -> Unit, onEdit: () -> Unit
                     Icon(Icons.Filled.Edit, contentDescription = "Edit Flashcard", tint = MaterialTheme.colorScheme.primary)
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete Flashcard", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete Flashcard", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
                 }
             }
         }
