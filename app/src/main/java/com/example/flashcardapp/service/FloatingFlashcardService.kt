@@ -8,6 +8,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -67,7 +68,10 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
 
         composeView = ComposeView(this).apply {
             setContent {
-                MaterialTheme {
+                val darkTheme = isSystemInDarkTheme()
+                val colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()
+                
+                MaterialTheme(colorScheme = colorScheme) {
                     val allFlashcards by repository.getAllFlashcards().collectAsState(initial = emptyList())
                     val selectedCategory by userPreferencesRepository.selectedCategoryFlow.collectAsState(initial = null)
                     
@@ -80,7 +84,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
             }
         }
 
-        // Draggable Logic using a simpler approach to avoid capture issues
+        // Draggable Logic
         var initialX = 100
         var initialY = 100
         var initialTouchX = 0f
