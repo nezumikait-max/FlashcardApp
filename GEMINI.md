@@ -17,10 +17,11 @@ This project is an Android application designed to help users learn with flashca
 - `com.example.flashcardapp.viewmodel`: UI state management, including category filtering.
 
 ## Features
-- **Dashboard**: Add, Edit, and Delete flashcards. Filter cards by Category.
-- **Study Mode**: Shuffled review mode within the app with tap-to-flip and navigation.
-- **Floating UI**: Overlay service for quick review over other apps.
-- **Categories**: Organize flashcards into decks/categories.
+- **Dashboard**: Full CRUD for flashcards, Keyword Search, Category filtering with real-time badges, and modern Swipe-to-Delete gestures.
+- **Study Mode**: Shuffled review mode with smooth 3D flip animations and horizontal card transitions. Includes a session completion summary.
+- **Floating UI**: Fully draggable overlay service that stays in sync with the app's category selection and supports multitasking.
+- **Modern UX**: Full Material 3 Dark Mode support that adapts to system settings.
+- **Persistence**: User preferences (like the last selected category) are persisted via Jetpack DataStore.
 
 ## Testing
 - Unit tests are located in `app/src/test`.
