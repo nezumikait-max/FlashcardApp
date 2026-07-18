@@ -7,13 +7,28 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.speech.tts.TextToSpeech
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -28,10 +43,11 @@ import com.example.flashcardapp.data.Flashcard
 import com.example.flashcardapp.repository.FlashcardRepository
 import com.example.flashcardapp.repository.UserPreferencesRepository
 import dagger.hilt.android.AndroidEntryPoint
+import java.util.Locale
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, ViewModelStoreOwner {
+class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, ViewModelStoreOwner, TextToSpeech.OnInitListener {
 
     @Inject
     lateinit var repository: FlashcardRepository
@@ -41,6 +57,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
 
     private lateinit var windowManager: WindowManager
     private lateinit var composeView: ComposeView
+    private var tts: TextToSpeech? = null
 
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
     override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
@@ -48,9 +65,31 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
     private val store = ViewModelStore()
     override val viewModelStore: ViewModelStore get() = store
 
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            tts?.language = Locale.US
+        }
+    }
+
+    private fun speak(text: String, category: String) {
+        tts?.apply {
+            if (category.equals("French", ignoreCase = true)) {
+                language = Locale.FRENCH
+                setPitch(1.0f)
+                setSpeechRate(1.0f)
+            } else {
+                language = Locale.US
+                setPitch(1.2f)
+                setSpeechRate(1.1f)
+            }
+            speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+        }
+    }
+
     @Suppress("DEPRECATION")
     override fun onCreate() {
         super.onCreate()
+        tts = TextToSpeech(this, this)
         savedStateRegistryController.performRestore(null)
 
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
@@ -80,10 +119,16 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                         if (selectedCategory == null) allFlashcards else allFlashcards.filter { it.category == selectedCategory }
                     }
                     
+                    var isMinimized by remember { mutableStateOf(false) }
+
                     FloatingCard(
                         flashcards = filteredFlashcards,
-                        currentGroupName = selectedCategory ?: "All Groups"
-                    ) { stopSelf() }
+                        currentGroupName = selectedCategory ?: "All Groups",
+                        isMinimized = isMinimized,
+                        onMinimizeToggle = { isMinimized = !isMinimized },
+                        onSpeak = { speak(it, selectedCategory ?: "General") },
+                        onClose = { stopSelf() }
+                    )
                 }
             }
         }
@@ -126,6 +171,8 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
 
     override fun onDestroy() {
         super.onDestroy()
+        tts?.stop()
+        tts?.shutdown()
         if (::composeView.isInitialized) {
             windowManager.removeView(composeView)
             composeView.disposeComposition()
@@ -135,7 +182,14 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
 }
 
 @Composable
-fun FloatingCard(flashcards: List<Flashcard>, currentGroupName: String, onClose: () -> Unit) {
+fun FloatingCard(
+    flashcards: List<Flashcard>, 
+    currentGroupName: String, 
+    isMinimized: Boolean,
+    onMinimizeToggle: () -> Unit,
+    onSpeak: (String) -> Unit,
+    onClose: () -> Unit
+) {
     var currentIndex by remember { mutableIntStateOf(0) }
     var showAnswer by remember { mutableStateOf(false) }
 
@@ -144,50 +198,142 @@ fun FloatingCard(flashcards: List<Flashcard>, currentGroupName: String, onClose:
         showAnswer = false
     }
 
-    Card(
-        modifier = Modifier
-            .padding(16.dp)
-            .width(250.dp)
-            .clickable {
-                if (flashcards.isNotEmpty()) {
-                    showAnswer = !showAnswer
-                }
-            },
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = currentGroupName,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
+    if (isMinimized) {
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)), CircleShape)
+                .clickable { onMinimizeToggle() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.FlashOn,
+                contentDescription = "Show Flashcard",
+                tint = Color.White
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            if (flashcards.isEmpty()) {
-                Text("No cards available in this category.", style = MaterialTheme.typography.bodyMedium)
-            } else {
-                val currentCard = flashcards[currentIndex % flashcards.size]
-                if (showAnswer) {
-                    Text("A: ${currentCard.answer}", style = MaterialTheme.typography.titleMedium)
-                } else {
-                    Text("Q: ${currentCard.question}", style = MaterialTheme.typography.titleMedium)
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+        }
+    } else {
+        Card(
+            modifier = Modifier
+                .padding(8.dp)
+                .width(250.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+            ),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+        ) {
+            Column(
+                modifier = Modifier
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.1f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+                    .padding(16.dp)
             ) {
-                Button(onClick = onClose) {
-                    Text("Close")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = currentGroupName,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = onMinimizeToggle, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Remove, contentDescription = "Minimize", modifier = Modifier.size(16.dp))
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(16.dp))
+                    }
                 }
-                if (flashcards.isNotEmpty()) {
-                    Button(
-                        onClick = {
-                            currentIndex++
-                            showAnswer = false
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .clickable {
+                            if (flashcards.isNotEmpty()) {
+                                showAnswer = !showAnswer
+                            }
                         }
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (flashcards.isEmpty()) {
+                        Text(
+                            "No cards available.", 
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        val currentCard = flashcards[currentIndex % flashcards.size]
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = if (showAnswer) "ANSWER" else "QUESTION",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                            Text(
+                                text = if (showAnswer) currentCard.answer else currentCard.question,
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        
+                        IconButton(
+                            onClick = { onSpeak(if (showAnswer) currentCard.answer else currentCard.question) },
+                            modifier = Modifier.align(Alignment.BottomEnd).size(32.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Speak", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (flashcards.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        Text("Next")
+                        FilledTonalButton(
+                            onClick = {
+                                if (currentIndex > 0) currentIndex--
+                                showAnswer = false
+                            },
+                            modifier = Modifier.weight(1f).height(36.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Prev", style = MaterialTheme.typography.labelLarge)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                currentIndex++
+                                showAnswer = false
+                            },
+                            modifier = Modifier.weight(1f).height(36.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Next", style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                 }
             }
