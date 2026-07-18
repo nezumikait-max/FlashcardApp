@@ -17,7 +17,7 @@ import javax.inject.Inject
 @HiltViewModel
 class FlashcardViewModel @Inject constructor(
     private val repository: FlashcardRepository,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")

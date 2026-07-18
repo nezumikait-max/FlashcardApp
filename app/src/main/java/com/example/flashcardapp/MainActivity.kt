@@ -1,7 +1,6 @@
 package com.example.flashcardapp
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.flashcardapp.data.Flashcard
 import com.example.flashcardapp.viewmodel.FlashcardViewModel
@@ -42,7 +43,7 @@ fun FlashcardTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composa
         darkColorScheme(
             primary = Color(0xFFD0BCFF),
             secondary = Color(0xFFCCC2DC),
-            tertiary = Color(0xFFEFB8C8)
+            tertiary = Color(0xFFEFB8C8),
         )
     } else {
         lightColorScheme(
@@ -71,12 +72,12 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     when (currentScreen) {
-                        AppScreen.Dashboard -> FlashcardScreen(
-                            onStartStudy = { currentScreen = AppScreen.Study }
-                        )
-                        AppScreen.Study -> StudyScreen(
-                            onExit = { currentScreen = AppScreen.Dashboard }
-                        )
+                        AppScreen.Dashboard -> FlashcardScreen {
+                            currentScreen = AppScreen.Study
+                        }
+                        AppScreen.Study -> StudyScreen {
+                            currentScreen = AppScreen.Dashboard
+                        }
                     }
                 }
             }
@@ -113,20 +114,24 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Button(onClick = {
-                    if (!Settings.canDrawOverlays(context)) {
-                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
-                        context.startActivity(intent)
+                Button(
+                    onClick = {
+                        if (!Settings.canDrawOverlays(context)) {
+                            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri())
+                            context.startActivity(intent)
+                        }
                     }
-                }) {
+                ) {
                     Text("Grant Overlay")
                 }
 
-                Button(onClick = {
-                    if (Settings.canDrawOverlays(context)) {
-                        context.startService(Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java))
+                Button(
+                    onClick = {
+                        if (Settings.canDrawOverlays(context)) {
+                            context.startService(Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java))
+                        }
                     }
-                }) {
+                ) {
                     Text("Launch Floating UI")
                 }
 
@@ -188,7 +193,7 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                     OutlinedTextField(
                         value = categoryText,
                         onValueChange = { categoryText = it },
-                        label = { Text("Category") },
+                        label = { Text("Study Group (e.g., French, Math)") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -229,9 +234,17 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                 }
             }
 
-            // Category Filter
+            // Study Group Filter
             val categories by viewModel.categories.collectAsState()
             val selectedCategory by viewModel.selectedCategory.collectAsState()
+
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                Text(
+                    text = "Active Study Group (shown in Floating UI):",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
 
             ScrollableTabRow(
                 selectedTabIndex = if (selectedCategory == null) 0 else categories.indexOf(selectedCategory) + 1,
@@ -259,7 +272,7 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(category)
                                 if (selectedCategory == category) {
-                                    Badge(modifier = Modifier.padding(start = 4.dp)) { Text("${flashcards.size}") }
+                                    Badge(modifier = Modifier.padding(start = 4.dp)) { Text(flashcards.size.toString()) }
                                 }
                             }
                         }
@@ -277,33 +290,34 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                     items = flashcards,
                     key = { it.id }
                 ) { flashcard ->
-                    val dismissState = rememberDismissState(
+                    val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = {
-                            if (it == DismissValue.DismissedToEnd || it == DismissValue.DismissedToStart) {
+                            if ((it == SwipeToDismissBoxValue.EndToStart) || (it == SwipeToDismissBoxValue.StartToEnd)) {
                                 viewModel.deleteFlashcard(flashcard)
                                 true
                             } else false
                         }
                     )
 
-                    SwipeToDismiss(
+                    SwipeToDismissBox(
                         state = dismissState,
-                        background = {
-                            val direction = dismissState.dismissDirection ?: return@SwipeToDismiss
+                        backgroundContent = {
+                            val direction = dismissState.dismissDirection
                             val color by animateColorAsState(
                                 when (dismissState.targetValue) {
-                                    DismissValue.Default -> Color.Transparent
+                                    SwipeToDismissBoxValue.Settled -> Color.Transparent
                                     else -> MaterialTheme.colorScheme.errorContainer
                                 },
                                 label = "Dismiss Color"
                             )
                             val alignment = when (direction) {
-                                DismissDirection.StartToEnd -> Alignment.CenterStart
-                                DismissDirection.EndToStart -> Alignment.CenterEnd
+                                SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                                SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+                                else -> Alignment.Center
                             }
                             val icon = Icons.Default.Delete
                             val scale by animateFloatAsState(
-                                if (dismissState.targetValue == DismissValue.Default) 0.75f else 1f,
+                                if (dismissState.targetValue == SwipeToDismissBoxValue.Settled) 0.75f else 1f,
                                 label = "Dismiss Icon Scale"
                             )
 
@@ -321,20 +335,19 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
-                        },
-                        dismissContent = {
-                            FlashcardItem(
-                                flashcard,
-                                onDelete = { viewModel.deleteFlashcard(flashcard) },
-                                onEdit = {
-                                    editingFlashcard = flashcard
-                                    questionText = flashcard.question
-                                    answerText = flashcard.answer
-                                    categoryText = flashcard.category
-                                }
-                            )
                         }
-                    )
+                    ) {
+                        FlashcardItem(
+                            flashcard,
+                            onDelete = { viewModel.deleteFlashcard(flashcard) },
+                            onEdit = {
+                                editingFlashcard = flashcard
+                                questionText = flashcard.question
+                                answerText = flashcard.answer
+                                categoryText = flashcard.category
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -378,7 +391,7 @@ fun FlashcardItem(flashcard: Flashcard, onDelete: () -> Unit, onEdit: () -> Unit
 @Composable
 fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit) {
     val flashcards by viewModel.flashcards.collectAsState()
-    var currentIndex by remember { mutableStateOf(0) }
+    var currentIndex by remember { mutableIntStateOf(0) }
     var rotated by remember { mutableStateOf(false) }
     var isFinished by remember { mutableStateOf(false) }
 
@@ -435,7 +448,6 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
                 }
             }
         } else {
-            val currentCard = shuffledCards[currentIndex]
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -535,7 +547,7 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
                         },
                         enabled = currentIndex > 0
                     ) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Previous Card")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Card")
                     }
                     
                     Text(
@@ -554,7 +566,7 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
                         }
                     ) {
                         Icon(
-                            if (currentIndex < shuffledCards.size - 1) Icons.Filled.ArrowForward else Icons.Filled.Check, 
+                            if (currentIndex < shuffledCards.size - 1) Icons.AutoMirrored.Filled.ArrowForward else Icons.Filled.Check,
                             contentDescription = if (currentIndex < shuffledCards.size - 1) "Next Card" else "Finish"
                         )
                     }

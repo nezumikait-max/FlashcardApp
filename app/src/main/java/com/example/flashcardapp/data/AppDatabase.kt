@@ -18,7 +18,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "flashcard_database"
+                    "flashcard_database",
                 )
                     .fallbackToDestructiveMigration()
                     .build()

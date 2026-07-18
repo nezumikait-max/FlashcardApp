@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LifecycleService
-import androidx.lifecycle.ViewTreeLifecycleOwner
-import androidx.lifecycle.ViewTreeViewModelStoreOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistry
@@ -48,6 +48,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
     private val store = ViewModelStore()
     override val viewModelStore: ViewModelStore get() = store
 
+    @Suppress("DEPRECATION")
     override fun onCreate() {
         super.onCreate()
         savedStateRegistryController.performRestore(null)
@@ -59,7 +60,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
             WindowManager.LayoutParams.WRAP_CONTENT,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
+            PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 100
@@ -79,7 +80,10 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                         if (selectedCategory == null) allFlashcards else allFlashcards.filter { it.category == selectedCategory }
                     }
                     
-                    FloatingCard(flashcards = filteredFlashcards, onClose = { stopSelf() })
+                    FloatingCard(
+                        flashcards = filteredFlashcards,
+                        currentGroupName = selectedCategory ?: "All Groups"
+                    ) { stopSelf() }
                 }
             }
         }
@@ -113,9 +117,9 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
             }
         }
 
-        ViewTreeLifecycleOwner.set(composeView, this)
+        composeView.setViewTreeLifecycleOwner(this)
         composeView.setViewTreeSavedStateRegistryOwner(this)
-        ViewTreeViewModelStoreOwner.set(composeView, this)
+        composeView.setViewTreeViewModelStoreOwner(this)
 
         windowManager.addView(composeView, params)
     }
@@ -131,8 +135,8 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
 }
 
 @Composable
-fun FloatingCard(flashcards: List<Flashcard>, onClose: () -> Unit) {
-    var currentIndex by remember { mutableStateOf(0) }
+fun FloatingCard(flashcards: List<Flashcard>, currentGroupName: String, onClose: () -> Unit) {
+    var currentIndex by remember { mutableIntStateOf(0) }
     var showAnswer by remember { mutableStateOf(false) }
 
     LaunchedEffect(flashcards.size) {
@@ -149,9 +153,15 @@ fun FloatingCard(flashcards: List<Flashcard>, onClose: () -> Unit) {
                     showAnswer = !showAnswer
                 }
             },
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = currentGroupName,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
             if (flashcards.isEmpty()) {
                 Text("No cards available in this category.", style = MaterialTheme.typography.bodyMedium)
             } else {
@@ -171,10 +181,12 @@ fun FloatingCard(flashcards: List<Flashcard>, onClose: () -> Unit) {
                     Text("Close")
                 }
                 if (flashcards.isNotEmpty()) {
-                    Button(onClick = {
-                        currentIndex++
-                        showAnswer = false
-                    }) {
+                    Button(
+                        onClick = {
+                            currentIndex++
+                            showAnswer = false
+                        }
+                    ) {
                         Text("Next")
                     }
                 }
