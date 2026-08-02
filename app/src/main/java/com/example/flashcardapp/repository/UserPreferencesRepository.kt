@@ -3,6 +3,7 @@ package com.example.flashcardapp.repository
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -24,6 +25,7 @@ class UserPreferencesRepository @Inject constructor(
         val SIDEBAR_SIDE = stringPreferencesKey("sidebar_side")
         val SIDEBAR_HEIGHT = intPreferencesKey("sidebar_height")
         val SIDEBAR_VERTICAL_OFFSET = intPreferencesKey("sidebar_vertical_offset")
+        val SIDEBAR_ENABLED = booleanPreferencesKey("sidebar_enabled")
     }
 
     val selectedCategoryFlow: Flow<String?> = context.dataStore.data
@@ -53,7 +55,12 @@ class UserPreferencesRepository @Inject constructor(
 
     val sidebarVerticalOffsetFlow: Flow<Int> = context.dataStore.data
         .map { preferences -> 
-            preferences[PreferencesKeys.SIDEBAR_VERTICAL_OFFSET] ?: 0
+            preferences[PreferencesKeys.SIDEBAR_VERTICAL_OFFSET] ?: 0 
+        }
+
+    val sidebarEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> 
+            preferences[PreferencesKeys.SIDEBAR_ENABLED] ?: false
         }
 
     suspend fun saveSelectedCategory(category: String?) {
@@ -93,6 +100,12 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun saveSidebarVerticalOffset(offset: Int) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.SIDEBAR_VERTICAL_OFFSET] = offset
+        }
+    }
+
+    suspend fun saveSidebarEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SIDEBAR_ENABLED] = enabled
         }
     }
 }

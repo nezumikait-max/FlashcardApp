@@ -141,14 +141,29 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
             combine(
                 userPreferencesRepository.sidebarSideFlow,
                 userPreferencesRepository.sidebarHeightFlow,
-                userPreferencesRepository.sidebarVerticalOffsetFlow
-            ) { side: String, height: Int, offset: Int ->
-                Triple(side, height, offset)
+                userPreferencesRepository.sidebarVerticalOffsetFlow,
+                userPreferencesRepository.sidebarEnabledFlow
+            ) { side: String, height: Int, offset: Int, enabled: Boolean ->
+                DataBundle(side, height, offset, enabled)
             }.collectLatest { data ->
-                val (side, height, offset) = data
-                updateSidebarPosition(side, height, offset)
+                if (data.enabled) {
+                    updateSidebarPosition(data.side, data.height, data.offset)
+                } else {
+                    removeSidebar()
+                }
             }
         }
+    }
+
+    private data class DataBundle(val side: String, val height: Int, val offset: Int, val enabled: Boolean)
+
+    private fun removeSidebar() {
+        sidebarView?.let {
+            try {
+                windowManager.removeView(it)
+            } catch (e: Exception) {}
+        }
+        sidebarView = null
     }
 
     private fun updateSidebarPosition(side: String, height: Int, offset: Int) {
@@ -182,7 +197,12 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                             if (side == "Left") RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)
                             else RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
                         )
-                        .background(color.copy(alpha = 0.6f))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = if (side == "Left") listOf(color, color.copy(alpha = 0.2f))
+                                         else listOf(color.copy(alpha = 0.2f), color)
+                            )
+                        )
                         .clickable { showQuickCreateDialog() }
                         .pointerInput(Unit) {
                             detectHorizontalDragGestures { _, dragAmount ->

@@ -142,6 +142,7 @@ fun SettingsScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Un
     val sidebarSide by viewModel.sidebarSide.collectAsState()
     val sidebarHeight by viewModel.sidebarHeight.collectAsState()
     val sidebarVerticalOffset by viewModel.sidebarVerticalOffset.collectAsState()
+    val sidebarEnabled by viewModel.sidebarEnabled.collectAsState()
     val context = LocalContext.current
 
     Box(
@@ -277,75 +278,93 @@ fun SettingsScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Un
 
                 GlassCard {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Dock, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                "SIDEBAR TRIGGER",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "Side position",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            listOf("Left", "Right").forEach { side ->
-                                OutlinedButton(
-                                    onClick = { viewModel.setSidebarSide(side) },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = BorderStroke(
-                                        1.dp, 
-                                        if (sidebarSide == side) MaterialTheme.colorScheme.primary 
-                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                                    ),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        containerColor = if (sidebarSide == side) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) 
-                                                        else Color.Transparent
-                                    )
-                                ) {
-                                    Text(
-                                        side, 
-                                        color = if (sidebarSide == side) MaterialTheme.colorScheme.primary 
-                                                else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Dock, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    "QUICK-CREATE SIDEBAR",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Switch(
+                                checked = sidebarEnabled,
+                                onCheckedChange = { enabled ->
+                                    viewModel.setSidebarEnabled(enabled)
+                                    if (enabled && Settings.canDrawOverlays(context)) {
+                                        context.startService(Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java))
+                                    }
+                                }
+                            )
+                        }
+
+                        if (sidebarEnabled) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                "Side position",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                listOf("Left", "Right").forEach { side ->
+                                    OutlinedButton(
+                                        onClick = { viewModel.setSidebarSide(side) },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = BorderStroke(
+                                            1.dp, 
+                                            if (sidebarSide == side) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                        ),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            containerColor = if (sidebarSide == side) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) 
+                                                            else Color.Transparent
+                                        )
+                                    ) {
+                                        Text(
+                                            side, 
+                                            color = if (sidebarSide == side) MaterialTheme.colorScheme.primary 
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                "Sidebar Height: ${sidebarHeight}dp",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Slider(
+                                value = sidebarHeight.toFloat(),
+                                onValueChange = { viewModel.setSidebarHeight(it.toInt()) },
+                                valueRange = 50f..400f,
+                                steps = 34
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Vertical Offset: ${sidebarVerticalOffset}dp",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Slider(
+                                value = sidebarVerticalOffset.toFloat(),
+                                onValueChange = { viewModel.setSidebarVerticalOffset(it.toInt()) },
+                                valueRange = -600f..600f,
+                                steps = 120
+                            )
                         }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "Button Height: ${sidebarHeight}dp",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Slider(
-                            value = sidebarHeight.toFloat(),
-                            onValueChange = { viewModel.setSidebarHeight(it.toInt()) },
-                            valueRange = 50f..300f,
-                            steps = 25
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Vertical Position",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Slider(
-                            value = sidebarVerticalOffset.toFloat(),
-                            onValueChange = { viewModel.setSidebarVerticalOffset(it.toInt()) },
-                            valueRange = -500f..500f,
-                            steps = 100
-                        )
                     }
                 }
                 
