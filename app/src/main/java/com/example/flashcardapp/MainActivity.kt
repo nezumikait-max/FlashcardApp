@@ -140,6 +140,8 @@ fun SettingsScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Un
     val autoCloseSeconds by viewModel.autoCloseSeconds.collectAsState()
     val appearanceIntervalMinutes by viewModel.appearanceIntervalMinutes.collectAsState()
     val sidebarSide by viewModel.sidebarSide.collectAsState()
+    val sidebarHeight by viewModel.sidebarHeight.collectAsState()
+    val sidebarVerticalOffset by viewModel.sidebarVerticalOffset.collectAsState()
     val context = LocalContext.current
 
     Box(
@@ -279,18 +281,18 @@ fun SettingsScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Un
                             Icon(Icons.Default.Dock, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                "QUICK-CREATE SIDEBAR",
+                                "SIDEBAR TRIGGER",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "Side to swipe from for Quick Create",
+                            "Side position",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -318,6 +320,32 @@ fun SettingsScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Un
                                 }
                             }
                         }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "Button Height: ${sidebarHeight}dp",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Slider(
+                            value = sidebarHeight.toFloat(),
+                            onValueChange = { viewModel.setSidebarHeight(it.toInt()) },
+                            valueRange = 50f..300f,
+                            steps = 25
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Vertical Position",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Slider(
+                            value = sidebarVerticalOffset.toFloat(),
+                            onValueChange = { viewModel.setSidebarVerticalOffset(it.toInt()) },
+                            valueRange = -500f..500f,
+                            steps = 100
+                        )
                     }
                 }
                 

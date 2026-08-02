@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import android.widget.Toast
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collectLatest
 import androidx.lifecycle.LifecycleService
@@ -137,30 +138,52 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
 
     private fun setupSidebarTrigger() {
         lifecycleScope.launch {
-            userPreferencesRepository.sidebarSideFlow.collectLatest { side ->
-                updateSidebarPosition(side)
+            combine(
+                userPreferencesRepository.sidebarSideFlow,
+                userPreferencesRepository.sidebarHeightFlow,
+                userPreferencesRepository.sidebarVerticalOffsetFlow
+            ) { side: String, height: Int, offset: Int ->
+                Triple(side, height, offset)
+            }.collectLatest { data ->
+                val (side, height, offset) = data
+                updateSidebarPosition(side, height, offset)
             }
         }
     }
 
-    private fun updateSidebarPosition(side: String) {
-        sidebarView?.let { windowManager.removeView(it) }
+    private fun updateSidebarPosition(side: String, height: Int, offset: Int) {
+        sidebarView?.let { 
+            try {
+                windowManager.removeView(it)
+            } catch (e: Exception) {}
+        }
         
         val sidebarParams = WindowManager.LayoutParams(
-            20.toPx(),
-            WindowManager.LayoutParams.MATCH_PARENT,
+            30.toPx(), // Width of the trigger button
+            height.toPx(),
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = if (side == "Left") Gravity.START else Gravity.END
+            gravity = (if (side == "Left") Gravity.START else Gravity.END) or Gravity.CENTER_VERTICAL
+            y = offset.toPx()
         }
 
         sidebarView = ComposeView(this).apply {
             setContent {
+                val darkTheme = isSystemInDarkTheme()
+                val color = if (darkTheme) Color(0xFF60A5FA) else Color(0xFF2563EB)
+                
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .padding(vertical = 4.dp)
+                        .clip(
+                            if (side == "Left") RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)
+                            else RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                        )
+                        .background(color.copy(alpha = 0.6f))
+                        .clickable { showQuickCreateDialog() }
                         .pointerInput(Unit) {
                             detectHorizontalDragGestures { _, dragAmount ->
                                 val threshold = 10f
@@ -170,15 +193,26 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                                     showQuickCreateDialog()
                                 }
                             }
-                        }
-                )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (side == "Left") Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
         
         sidebarView?.setViewTreeLifecycleOwner(this)
         sidebarView?.setViewTreeSavedStateRegistryOwner(this)
         sidebarView?.setViewTreeViewModelStoreOwner(this)
-        windowManager.addView(sidebarView, sidebarParams)
+        
+        try {
+            windowManager.addView(sidebarView, sidebarParams)
+        } catch (e: Exception) {}
     }
 
     private fun showQuickCreateDialog() {

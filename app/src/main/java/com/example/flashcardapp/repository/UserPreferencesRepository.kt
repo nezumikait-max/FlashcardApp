@@ -22,6 +22,8 @@ class UserPreferencesRepository @Inject constructor(
         val AUTO_CLOSE_SECONDS = intPreferencesKey("auto_close_seconds")
         val APPEARANCE_INTERVAL_MINUTES = intPreferencesKey("appearance_interval_minutes")
         val SIDEBAR_SIDE = stringPreferencesKey("sidebar_side")
+        val SIDEBAR_HEIGHT = intPreferencesKey("sidebar_height")
+        val SIDEBAR_VERTICAL_OFFSET = intPreferencesKey("sidebar_vertical_offset")
     }
 
     val selectedCategoryFlow: Flow<String?> = context.dataStore.data
@@ -42,6 +44,16 @@ class UserPreferencesRepository @Inject constructor(
     val sidebarSideFlow: Flow<String> = context.dataStore.data
         .map { preferences -> 
             preferences[PreferencesKeys.SIDEBAR_SIDE] ?: "Right" 
+        }
+
+    val sidebarHeightFlow: Flow<Int> = context.dataStore.data
+        .map { preferences -> 
+            preferences[PreferencesKeys.SIDEBAR_HEIGHT] ?: 100 
+        }
+
+    val sidebarVerticalOffsetFlow: Flow<Int> = context.dataStore.data
+        .map { preferences -> 
+            preferences[PreferencesKeys.SIDEBAR_VERTICAL_OFFSET] ?: 0
         }
 
     suspend fun saveSelectedCategory(category: String?) {
@@ -69,6 +81,18 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun saveSidebarSide(side: String) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.SIDEBAR_SIDE] = side
+        }
+    }
+
+    suspend fun saveSidebarHeight(height: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SIDEBAR_HEIGHT] = height
+        }
+    }
+
+    suspend fun saveSidebarVerticalOffset(offset: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SIDEBAR_VERTICAL_OFFSET] = offset
         }
     }
 }

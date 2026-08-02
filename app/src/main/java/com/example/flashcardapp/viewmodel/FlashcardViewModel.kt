@@ -60,6 +60,12 @@ class FlashcardViewModel @Inject constructor(
     val sidebarSide: StateFlow<String> = userPreferencesRepository.sidebarSideFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Right")
 
+    val sidebarHeight: StateFlow<Int> = userPreferencesRepository.sidebarHeightFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 100)
+
+    val sidebarVerticalOffset: StateFlow<Int> = userPreferencesRepository.sidebarVerticalOffsetFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
     fun setAutoCloseSeconds(seconds: Int) {
         viewModelScope.launch {
             userPreferencesRepository.saveAutoCloseSeconds(seconds)
@@ -75,6 +81,18 @@ class FlashcardViewModel @Inject constructor(
     fun setSidebarSide(side: String) {
         viewModelScope.launch {
             userPreferencesRepository.saveSidebarSide(side)
+        }
+    }
+
+    fun setSidebarHeight(height: Int) {
+        viewModelScope.launch {
+            userPreferencesRepository.saveSidebarHeight(height)
+        }
+    }
+
+    fun setSidebarVerticalOffset(offset: Int) {
+        viewModelScope.launch {
+            userPreferencesRepository.saveSidebarVerticalOffset(offset)
         }
     }
 
