@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -138,6 +139,7 @@ class MainActivity : ComponentActivity() {
 fun SettingsScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Unit) {
     val autoCloseSeconds by viewModel.autoCloseSeconds.collectAsState()
     val appearanceIntervalMinutes by viewModel.appearanceIntervalMinutes.collectAsState()
+    val sidebarSide by viewModel.sidebarSide.collectAsState()
     val context = LocalContext.current
 
     Box(
@@ -268,6 +270,54 @@ fun SettingsScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Un
                             valueRange = 1f..60f,
                             steps = 59
                         )
+                    }
+                }
+
+                GlassCard {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Dock, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                "QUICK-CREATE SIDEBAR",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Side to swipe from for Quick Create",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            listOf("Left", "Right").forEach { side ->
+                                OutlinedButton(
+                                    onClick = { viewModel.setSidebarSide(side) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(
+                                        1.dp, 
+                                        if (sidebarSide == side) MaterialTheme.colorScheme.primary 
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                    ),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = if (sidebarSide == side) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) 
+                                                        else Color.Transparent
+                                    )
+                                ) {
+                                    Text(
+                                        side, 
+                                        color = if (sidebarSide == side) MaterialTheme.colorScheme.primary 
+                                                else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 

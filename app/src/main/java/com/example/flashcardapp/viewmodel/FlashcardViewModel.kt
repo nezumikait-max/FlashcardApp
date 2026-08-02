@@ -57,6 +57,9 @@ class FlashcardViewModel @Inject constructor(
     val appearanceIntervalMinutes: StateFlow<Int> = userPreferencesRepository.appearanceIntervalMinutesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1)
 
+    val sidebarSide: StateFlow<String> = userPreferencesRepository.sidebarSideFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Right")
+
     fun setAutoCloseSeconds(seconds: Int) {
         viewModelScope.launch {
             userPreferencesRepository.saveAutoCloseSeconds(seconds)
@@ -66,6 +69,12 @@ class FlashcardViewModel @Inject constructor(
     fun setAppearanceIntervalMinutes(minutes: Int) {
         viewModelScope.launch {
             userPreferencesRepository.saveAppearanceIntervalMinutes(minutes)
+        }
+    }
+
+    fun setSidebarSide(side: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.saveSidebarSide(side)
         }
     }
 

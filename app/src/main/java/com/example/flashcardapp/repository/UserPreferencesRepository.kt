@@ -21,6 +21,7 @@ class UserPreferencesRepository @Inject constructor(
         val SELECTED_CATEGORY = stringPreferencesKey("selected_category")
         val AUTO_CLOSE_SECONDS = intPreferencesKey("auto_close_seconds")
         val APPEARANCE_INTERVAL_MINUTES = intPreferencesKey("appearance_interval_minutes")
+        val SIDEBAR_SIDE = stringPreferencesKey("sidebar_side")
     }
 
     val selectedCategoryFlow: Flow<String?> = context.dataStore.data
@@ -36,6 +37,11 @@ class UserPreferencesRepository @Inject constructor(
     val appearanceIntervalMinutesFlow: Flow<Int> = context.dataStore.data
         .map { preferences -> 
             preferences[PreferencesKeys.APPEARANCE_INTERVAL_MINUTES] ?: 1 
+        }
+
+    val sidebarSideFlow: Flow<String> = context.dataStore.data
+        .map { preferences -> 
+            preferences[PreferencesKeys.SIDEBAR_SIDE] ?: "Right" 
         }
 
     suspend fun saveSelectedCategory(category: String?) {
@@ -57,6 +63,12 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun saveAppearanceIntervalMinutes(minutes: Int) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.APPEARANCE_INTERVAL_MINUTES] = minutes
+        }
+    }
+
+    suspend fun saveSidebarSide(side: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SIDEBAR_SIDE] = side
         }
     }
 }

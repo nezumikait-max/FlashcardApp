@@ -35,11 +35,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import android.widget.Toast
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -68,6 +70,8 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
 
     private lateinit var windowManager: WindowManager
     private var composeView: ComposeView? = null
+    private var sidebarView: ComposeView? = null
+    private var quickCreateView: ComposeView? = null
     private var tts: TextToSpeech? = null
 
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -79,7 +83,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
     private var appearanceJob: Job? = null
     private var isViewAdded = false
 
-    private val params = WindowManager.LayoutParams(
+    private val flashcardParams = WindowManager.LayoutParams(
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.WRAP_CONTENT,
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
@@ -89,6 +93,16 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         gravity = Gravity.TOP or Gravity.START
         x = 100
         y = 100
+    }
+
+    private val quickCreateParams = WindowManager.LayoutParams(
+        WindowManager.LayoutParams.WRAP_CONTENT,
+        WindowManager.LayoutParams.WRAP_CONTENT,
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM,
+        PixelFormat.TRANSLUCENT,
+    ).apply {
+        gravity = Gravity.CENTER
     }
 
     override fun onInit(status: Int) {
@@ -106,7 +120,6 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
             } else {
                 language = Locale.US
                 setPitch(1.2f)
-                setSpeechRate(1.1f)
             }
             speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
         }
@@ -118,7 +131,96 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         tts = TextToSpeech(this, this)
         savedStateRegistryController.performRestore(null)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        
+        setupSidebarTrigger()
     }
+
+    private fun setupSidebarTrigger() {
+        lifecycleScope.launch {
+            userPreferencesRepository.sidebarSideFlow.collectLatest { side ->
+                updateSidebarPosition(side)
+            }
+        }
+    }
+
+    private fun updateSidebarPosition(side: String) {
+        sidebarView?.let { windowManager.removeView(it) }
+        
+        val sidebarParams = WindowManager.LayoutParams(
+            20.toPx(),
+            WindowManager.LayoutParams.MATCH_PARENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = if (side == "Left") Gravity.START else Gravity.END
+        }
+
+        sidebarView = ComposeView(this).apply {
+            setContent {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures { _, dragAmount ->
+                                val threshold = 10f
+                                if (side == "Left" && dragAmount > threshold) {
+                                    showQuickCreateDialog()
+                                } else if (side == "Right" && dragAmount < -threshold) {
+                                    showQuickCreateDialog()
+                                }
+                            }
+                        }
+                )
+            }
+        }
+        
+        sidebarView?.setViewTreeLifecycleOwner(this)
+        sidebarView?.setViewTreeSavedStateRegistryOwner(this)
+        sidebarView?.setViewTreeViewModelStoreOwner(this)
+        windowManager.addView(sidebarView, sidebarParams)
+    }
+
+    private fun showQuickCreateDialog() {
+        if (quickCreateView != null) return
+
+        quickCreateView = ComposeView(this).apply {
+            setContent {
+                val darkTheme = isSystemInDarkTheme()
+                val colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()
+                
+                MaterialTheme(colorScheme = colorScheme) {
+                    val categories by repository.getCategories().collectAsState(initial = emptyList())
+                    
+                    QuickCreateCard(
+                        categories = categories,
+                        onSave = { q, a, cat ->
+                            lifecycleScope.launch {
+                                repository.insertFlashcard(Flashcard(question = q, answer = a, category = cat))
+                            }
+                            hideQuickCreateDialog()
+                        },
+                        onClose = { hideQuickCreateDialog() }
+                    )
+                }
+            }
+        }
+        
+        quickCreateView?.setViewTreeLifecycleOwner(this)
+        quickCreateView?.setViewTreeSavedStateRegistryOwner(this)
+        quickCreateView?.setViewTreeViewModelStoreOwner(this)
+        windowManager.addView(quickCreateView, quickCreateParams)
+    }
+
+    private fun hideQuickCreateDialog() {
+        quickCreateView?.let {
+            windowManager.removeView(it)
+            it.disposeComposition()
+        }
+        quickCreateView = null
+    }
+
+    private fun Int.toPx(): Int = (this * resources.displayMetrics.density).toInt()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val result = super.onStartCommand(intent, flags, startId)
@@ -133,15 +235,10 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
             Toast.makeText(this@FloatingFlashcardService, "Floating cards will appear every $intervalMinutes min(s)", Toast.LENGTH_SHORT).show()
             
             while (isActive) {
-                // Show the card
                 showFloatingCard()
-                
-                // Wait for the card to be closed
                 while (isViewAdded) {
                     delay(1000)
                 }
-
-                // Wait for interval after closing
                 delay(intervalMinutes * 60 * 1000L)
             }
         }
@@ -174,9 +271,9 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                         onMinimizeToggle = { isMinimized = !isMinimized },
                         onClose = { hideFloatingCard() },
                         onMove = { dx, dy ->
-                            params.x += dx.toInt()
-                            params.y += dy.toInt()
-                            windowManager.updateViewLayout(this@apply, params)
+                            flashcardParams.x += dx.toInt()
+                            flashcardParams.y += dy.toInt()
+                            windowManager.updateViewLayout(this@apply, flashcardParams)
                         }
                     )
                 }
@@ -187,7 +284,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         composeView?.setViewTreeSavedStateRegistryOwner(this)
         composeView?.setViewTreeViewModelStoreOwner(this)
 
-        windowManager.addView(composeView, params)
+        windowManager.addView(composeView, flashcardParams)
         isViewAdded = true
     }
 
@@ -207,8 +304,112 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         tts?.stop()
         tts?.shutdown()
         hideFloatingCard()
+        hideQuickCreateDialog()
+        sidebarView?.let { windowManager.removeView(it) }
         appearanceJob?.cancel()
         store.clear()
+    }
+}
+
+@Composable
+fun QuickCreateCard(
+    categories: List<String>,
+    onSave: (String, String, String) -> Unit,
+    onClose: () -> Unit
+) {
+    var question by remember { mutableStateOf("") }
+    var answer by remember { mutableStateOf("") }
+    var categoryText by remember { mutableStateOf("General") }
+    var categoryExpanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .width(280.dp)
+            .padding(16.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "QUICK CREATE",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(16.dp))
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedTextField(
+                value = question,
+                onValueChange = { question = it },
+                placeholder = { Text("Question") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                textStyle = MaterialTheme.typography.bodyMedium
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            OutlinedTextField(
+                value = answer,
+                onValueChange = { answer = it },
+                placeholder = { Text("Answer") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                textStyle = MaterialTheme.typography.bodyMedium
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = categoryText,
+                    onValueChange = { categoryText = it; categoryExpanded = true },
+                    placeholder = { Text("Category") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+                
+                val filtered = categories.filter { it.contains(categoryText, true) }
+                if (categoryExpanded && filtered.isNotEmpty()) {
+                    DropdownMenu(
+                        expanded = categoryExpanded,
+                        onDismissRequest = { categoryExpanded = false },
+                        modifier = Modifier.width(200.dp)
+                    ) {
+                        filtered.forEach { cat ->
+                            DropdownMenuItem(
+                                text = { Text(cat) },
+                                onClick = { categoryText = cat; categoryExpanded = false }
+                            )
+                        }
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            Button(
+                onClick = { if (question.isNotBlank() && answer.isNotBlank()) onSave(question, answer, categoryText) },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("SAVE CARD", fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 
