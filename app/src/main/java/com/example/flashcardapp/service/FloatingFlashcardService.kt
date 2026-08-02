@@ -63,6 +63,12 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, ViewModelStoreOwner, TextToSpeech.OnInitListener {
 
+    companion object {
+        const val ACTION_SHOW_CARDS = "ACTION_SHOW_CARDS"
+        const val ACTION_START_SIDEBAR = "ACTION_START_SIDEBAR"
+        const val EXTRA_SETTINGS_MODE = "EXTRA_SETTINGS_MODE"
+    }
+
     @Inject
     lateinit var repository: FlashcardRepository
 
@@ -75,6 +81,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
     private var quickCreateView: ComposeView? = null
     private var tts: TextToSpeech? = null
 
+    private var isSettingsMode = false
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
     override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
     
@@ -197,11 +204,17 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                             if (side == "Left") RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)
                             else RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
                         )
-                        .background(
-                            Brush.horizontalGradient(
-                                colors = if (side == "Left") listOf(color, color.copy(alpha = 0.2f))
-                                         else listOf(color.copy(alpha = 0.2f), color)
-                            )
+                        .then(
+                            if (isSettingsMode) {
+                                Modifier.background(
+                                    Brush.horizontalGradient(
+                                        colors = if (side == "Left") listOf(color, color.copy(alpha = 0.2f))
+                                                 else listOf(color.copy(alpha = 0.2f), color)
+                                    )
+                                )
+                            } else {
+                                Modifier.background(Color.Transparent)
+                            }
                         )
                         .clickable { showQuickCreateDialog() }
                         .pointerInput(Unit) {
@@ -216,12 +229,14 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = if (side == "Left") Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    if (isSettingsMode) {
+                        Icon(
+                            imageVector = if (side == "Left") Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -278,7 +293,17 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val result = super.onStartCommand(intent, flags, startId)
-        startAppearanceTimer()
+        
+        isSettingsMode = intent?.getBooleanExtra(EXTRA_SETTINGS_MODE, false) ?: false
+        
+        when (intent?.action) {
+            ACTION_SHOW_CARDS -> startAppearanceTimer()
+            ACTION_START_SIDEBAR -> { /* Sidebar trigger is always setup in onCreate */ }
+        }
+        
+        // Re-setup sidebar trigger to apply settings mode visibility change
+        setupSidebarTrigger()
+
         return result
     }
 

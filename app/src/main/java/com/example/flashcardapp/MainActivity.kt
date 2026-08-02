@@ -107,6 +107,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             FlashcardTheme {
                 var currentScreen by remember { mutableStateOf(AppScreen.Dashboard) }
+                val context = LocalContext.current
 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -121,8 +122,24 @@ class MainActivity : ComponentActivity() {
                         AppScreen.Study -> StudyScreen {
                             currentScreen = AppScreen.Dashboard
                         }
-                        AppScreen.Settings -> SettingsScreen {
-                            currentScreen = AppScreen.Dashboard
+                        AppScreen.Settings -> {
+                            LaunchedEffect(Unit) {
+                                val intent = Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java).apply {
+                                    putExtra("EXTRA_SETTINGS_MODE", true)
+                                }
+                                context.startService(intent)
+                            }
+                            DisposableEffect(Unit) {
+                                onDispose {
+                                    val intent = Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java).apply {
+                                        putExtra("EXTRA_SETTINGS_MODE", false)
+                                    }
+                                    context.startService(intent)
+                                }
+                            }
+                            SettingsScreen(currentScreen = currentScreen) {
+                                currentScreen = AppScreen.Dashboard
+                            }
                         }
                         AppScreen.Trash -> TrashScreen(
                             onBack = { currentScreen = AppScreen.Dashboard }
@@ -136,7 +153,11 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Unit) {
+fun SettingsScreen(
+    viewModel: FlashcardViewModel = viewModel(),
+    currentScreen: AppScreen,
+    onBack: () -> Unit
+) {
     val autoCloseSeconds by viewModel.autoCloseSeconds.collectAsState()
     val appearanceIntervalMinutes by viewModel.appearanceIntervalMinutes.collectAsState()
     val sidebarSide by viewModel.sidebarSide.collectAsState()
@@ -210,7 +231,10 @@ fun SettingsScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Un
                             GlassButton(
                                 onClick = {
                                     if (Settings.canDrawOverlays(context)) {
-                                        context.startService(Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java))
+                                        val intent = Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java).apply {
+                                            action = "ACTION_SHOW_CARDS"
+                                        }
+                                        context.startService(intent)
                                     }
                                 },
                                 modifier = Modifier.weight(1f),
@@ -297,7 +321,11 @@ fun SettingsScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Un
                                 onCheckedChange = { enabled ->
                                     viewModel.setSidebarEnabled(enabled)
                                     if (enabled && Settings.canDrawOverlays(context)) {
-                                        context.startService(Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java))
+                                        val intent = Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java).apply {
+                                            action = "ACTION_START_SIDEBAR"
+                                            putExtra("EXTRA_SETTINGS_MODE", currentScreen == AppScreen.Settings)
+                                        }
+                                        context.startService(intent)
                                     }
                                 }
                             )
