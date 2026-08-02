@@ -11,6 +11,8 @@ class FlashcardRepository @Inject constructor(
     private val flashcardDao: FlashcardDao,
 ) {
     fun getAllFlashcards(): Flow<List<Flashcard>> = flashcardDao.getAllFlashcards()
+    
+    fun getTrashedFlashcards(): Flow<List<Flashcard>> = flashcardDao.getTrashedFlashcards()
 
     fun getCategories(): Flow<List<String>> = flashcardDao.getCategories()
 
@@ -18,7 +20,19 @@ class FlashcardRepository @Inject constructor(
         flashcardDao.insertFlashcard(flashcard)
     }
 
+    suspend fun moveToTrash(flashcard: Flashcard) {
+        flashcardDao.moveToTrash(flashcard.id)
+    }
+
+    suspend fun restoreFromTrash(flashcard: Flashcard) {
+        flashcardDao.restoreFromTrash(flashcard.id)
+    }
+
     suspend fun deleteFlashcard(flashcard: Flashcard) {
         flashcardDao.deleteFlashcard(flashcard)
+    }
+    
+    suspend fun emptyTrash() {
+        flashcardDao.emptyTrash()
     }
 }

@@ -33,6 +33,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,7 +56,9 @@ import dagger.hilt.android.AndroidEntryPoint
 
 enum class AppScreen {
     Dashboard,
-    Study
+    Study,
+    Settings,
+    Trash
 }
 
 @Composable
@@ -98,12 +112,20 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     when (currentScreen) {
-                        AppScreen.Dashboard -> FlashcardScreen {
-                            currentScreen = AppScreen.Study
-                        }
+                        AppScreen.Dashboard -> FlashcardScreen(
+                            onStartStudy = { currentScreen = AppScreen.Study },
+                            onOpenSettings = { currentScreen = AppScreen.Settings },
+                            onOpenTrash = { currentScreen = AppScreen.Trash }
+                        )
                         AppScreen.Study -> StudyScreen {
                             currentScreen = AppScreen.Dashboard
                         }
+                        AppScreen.Settings -> SettingsScreen {
+                            currentScreen = AppScreen.Dashboard
+                        }
+                        AppScreen.Trash -> TrashScreen(
+                            onBack = { currentScreen = AppScreen.Dashboard }
+                        )
                     }
                 }
             }
@@ -113,15 +135,175 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: () -> Unit) {
-    val flashcards by viewModel.flashcards.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
+fun SettingsScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Unit) {
+    val autoCloseSeconds by viewModel.autoCloseSeconds.collectAsState()
+    val appearanceIntervalMinutes by viewModel.appearanceIntervalMinutes.collectAsState()
     val context = LocalContext.current
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF09090B), Color(0xFF0F172A))
+                )
+            )
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            "SETTINGS",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.Transparent
+                    )
+                )
+            }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Overlay Permissions & Toggle
+                GlassCard {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            "FLOATING UI PERMISSIONS",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            GlassButton(
+                                onClick = {
+                                    if (!Settings.canDrawOverlays(context)) {
+                                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri())
+                                        context.startActivity(intent)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                text = "GRANT",
+                                icon = Icons.Default.Security
+                            )
+
+                            GlassButton(
+                                onClick = {
+                                    if (Settings.canDrawOverlays(context)) {
+                                        context.startService(Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java))
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                text = "START",
+                                icon = Icons.Default.Layers,
+                                accentColor = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                }
+
+                GlassCard {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                "AUTO-CLOSE TIMER",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Close floating card after ${autoCloseSeconds}s of inactivity",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Slider(
+                            value = autoCloseSeconds.toFloat(),
+                            onValueChange = { viewModel.setAutoCloseSeconds(it.toInt()) },
+                            valueRange = 5f..120f,
+                            steps = 23
+                        )
+                    }
+                }
+
+                GlassCard {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                "APPEARANCE INTERVAL",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Show a flashcard every $appearanceIntervalMinutes minute(s)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Slider(
+                            value = appearanceIntervalMinutes.toFloat(),
+                            onValueChange = { viewModel.setAppearanceIntervalMinutes(it.toInt()) },
+                            valueRange = 1f..60f,
+                            steps = 59
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.weight(1f))
+                
+                Text(
+                    "Note: Settings apply to the Floating UI.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FlashcardScreen(
+    viewModel: FlashcardViewModel = viewModel(),
+    onOpenSettings: () -> Unit,
+    onOpenTrash: () -> Unit,
+    onStartStudy: () -> Unit
+) {
+    val flashcards by viewModel.flashcards.collectAsState()
+    val categories by viewModel.categories.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val selectedCategory by viewModel.selectedCategory.collectAsState()
 
     var questionText by remember { mutableStateOf("") }
     var answerText by remember { mutableStateOf("") }
     var categoryText by remember { mutableStateOf("General") }
     var editingFlashcard by remember { mutableStateOf<Flashcard?>(null) }
+    
+    var categoryExpanded by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -144,181 +326,233 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                             letterSpacing = 2.sp
                         )
                     },
+                    actions = {
+                        IconButton(onClick = onOpenTrash) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = "Recycle Bin")
+                        }
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                    },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                         containerColor = Color.Transparent
                     )
                 )
             }
         ) { padding ->
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Permission and Launch Buttons
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    GlassButton(
+                // Header & Search
+                item {
+                    GlassTextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.setSearchQuery(it) },
+                        placeholder = "Search decks...",
+                        leadingIcon = Icons.Default.Search,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+
+                // Input Form
+                item {
+                    GlassCard {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Text(
+                                text = if (editingFlashcard == null) "CREATE NEW" else "EDIT CARD",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.primary,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            GlassTextField(
+                                value = questionText,
+                                onValueChange = { questionText = it },
+                                placeholder = "Question",
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            GlassTextField(
+                                value = answerText,
+                                onValueChange = { answerText = it },
+                                placeholder = "Answer",
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                GlassTextField(
+                                    value = categoryText,
+                                    onValueChange = { 
+                                        categoryText = it
+                                        categoryExpanded = true
+                                    },
+                                    placeholder = "Study Group (e.g., French, Math)",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .onFocusChanged { if (it.isFocused) categoryExpanded = true }
+                                )
+                                
+                                val filteredCategories = if (categoryText.isBlank()) categories else categories.filter {
+                                    it.contains(categoryText, ignoreCase = true) 
+                                }
+                                
+                                if (categoryExpanded && filteredCategories.isNotEmpty()) {
+                                    DropdownMenu(
+                                        expanded = categoryExpanded,
+                                        onDismissRequest = { categoryExpanded = false },
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.8f)
+                                            .background(Color(0xFF1E293B)),
+                                        properties = PopupProperties(focusable = false)
+                                    ) {
+                                        filteredCategories.forEach { category ->
+                                            DropdownMenuItem(
+                                                text = { Text(category, color = Color.White) },
+                                                onClick = {
+                                                    categoryText = category
+                                                    categoryExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Button(
+                                    onClick = {
+                                        if (questionText.isNotBlank() && answerText.isNotBlank()) {
+                                            if (editingFlashcard == null) {
+                                                viewModel.insertFlashcard(questionText, answerText, categoryText)
+                                            } else {
+                                                viewModel.updateFlashcard(editingFlashcard!!.copy(question = questionText, answer = answerText, category = categoryText))
+                                                editingFlashcard = null
+                                            }
+                                            questionText = ""
+                                            answerText = ""
+                                            categoryText = "General"
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Text(if (editingFlashcard == null) "SAVE" else "UPDATE", fontWeight = FontWeight.Bold)
+                                }
+                                if (editingFlashcard != null) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            editingFlashcard = null
+                                            questionText = ""
+                                            answerText = ""
+                                            categoryText = "General"
+                                        },
+                                        modifier = Modifier.weight(1f).height(48.dp),
+                                        shape = RoundedCornerShape(16.dp)
+                                    ) {
+                                        Text("CANCEL", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Important Start Button
+                item {
+                    val context = LocalContext.current
+                    Button(
                         onClick = {
-                            if (!Settings.canDrawOverlays(context)) {
+                            if (Settings.canDrawOverlays(context)) {
+                                context.startService(Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java))
+                            } else {
                                 val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri())
                                 context.startActivity(intent)
                             }
                         },
-                        modifier = Modifier.weight(1f),
-                        text = "GRANT OVERLAY",
-                        icon = Icons.Default.Security
-                    )
-
-                    GlassButton(
-                        onClick = {
-                            if (Settings.canDrawOverlays(context)) {
-                                context.startService(Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java))
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        text = "FLOATING UI",
-                        icon = Icons.Default.Layers,
-                        accentColor = MaterialTheme.colorScheme.secondary
-                    )
-                }
-
-                // Search Bar
-                GlassTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.setSearchQuery(it) },
-                    placeholder = "Search decks...",
-                    leadingIcon = Icons.Default.Search,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-
-                // Input Form
-                GlassCard(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            text = if (editingFlashcard == null) "CREATE NEW" else "EDIT CARD",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        GlassTextField(
-                            value = questionText,
-                            onValueChange = { questionText = it },
-                            placeholder = "Question",
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        GlassTextField(
-                            value = answerText,
-                            onValueChange = { answerText = it },
-                            placeholder = "Answer",
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        GlassTextField(
-                            value = categoryText,
-                            onValueChange = { categoryText = it },
-                            placeholder = "Study Group (e.g., French, Math)",
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(20.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(
-                                onClick = {
-                                    if (questionText.isNotBlank() && answerText.isNotBlank()) {
-                                        if (editingFlashcard == null) {
-                                            viewModel.insertFlashcard(questionText, answerText, categoryText)
-                                        } else {
-                                            viewModel.updateFlashcard(editingFlashcard!!.copy(question = questionText, answer = answerText, category = categoryText))
-                                            editingFlashcard = null
-                                        }
-                                        questionText = ""
-                                        answerText = ""
-                                        categoryText = "General"
-                                    }
-                                },
-                                modifier = Modifier.weight(1f).height(48.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                            ) {
-                                Text(if (editingFlashcard == null) "SAVE" else "UPDATE", fontWeight = FontWeight.Bold)
-                            }
-                            if (editingFlashcard != null) {
-                                OutlinedButton(
-                                    onClick = {
-                                        editingFlashcard = null
-                                        questionText = ""
-                                        answerText = ""
-                                        categoryText = "General"
-                                    },
-                                    modifier = Modifier.weight(1f).height(48.dp),
-                                    shape = RoundedCornerShape(16.dp)
-                                ) {
-                                    Text("CANCEL", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Study Group Filter
-                val categories by viewModel.categories.collectAsState()
-                val selectedCategory by viewModel.selectedCategory.collectAsState()
-
-                Text(
-                    text = "STUDY GROUPS",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                    letterSpacing = 1.sp
-                )
-
-                ScrollableTabRow(
-                    selectedTabIndex = if (selectedCategory == null) 0 else categories.indexOf(selectedCategory) + 1,
-                    edgePadding = 16.dp,
-                    modifier = Modifier.fillMaxWidth(),
-                    containerColor = Color.Transparent,
-                    divider = {},
-                    indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[if (selectedCategory == null) 0 else categories.indexOf(selectedCategory) + 1]),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                ) {
-                    Tab(
-                        selected = selectedCategory == null,
-                        onClick = { viewModel.setSelectedCategory(null) },
-                        text = { 
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp)
+                            .padding(bottom = 12.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.secondary,
+                                            MaterialTheme.colorScheme.tertiary
+                                        )
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("ALL", fontWeight = if (selectedCategory == null) FontWeight.Bold else FontWeight.Normal)
-                                if (selectedCategory == null) {
-                                    Badge(
-                                        modifier = Modifier.padding(start = 6.dp),
-                                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                        contentColor = MaterialTheme.colorScheme.primary
-                                    ) { Text(flashcards.size.toString()) }
-                                }
+                                Icon(Icons.Default.FlashOn, contentDescription = null, tint = Color.White)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    "START FLOATING CARDS",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White,
+                                    letterSpacing = 1.sp
+                                )
                             }
                         }
+                    }
+                }
+
+                // Study Groups Section
+                item {
+                    Text(
+                        text = "STUDY GROUPS",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        letterSpacing = 1.sp
                     )
-                    categories.forEach { category ->
+                }
+
+                item {
+                    val selectedTabIndex = if (selectedCategory == null) 0 else {
+                        val index = categories.indexOf(selectedCategory)
+                        if (index == -1) 0 else index + 1
+                    }
+
+                    ScrollableTabRow(
+                        selectedTabIndex = selectedTabIndex,
+                        edgePadding = 0.dp,
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = Color.Transparent,
+                        divider = {},
+                        indicator = { tabPositions ->
+                            if (selectedTabIndex < tabPositions.size) {
+                                TabRowDefaults.SecondaryIndicator(
+                                    Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    ) {
                         Tab(
-                            selected = selectedCategory == category,
-                            onClick = { viewModel.setSelectedCategory(category) },
+                            selected = selectedCategory == null,
+                            onClick = { viewModel.setSelectedCategory(null) },
                             text = { 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(category.uppercase(), fontWeight = if (selectedCategory == category) FontWeight.Bold else FontWeight.Normal)
-                                    if (selectedCategory == category) {
+                                    Text("ALL", fontWeight = if (selectedCategory == null) FontWeight.Bold else FontWeight.Normal)
+                                    if (selectedCategory == null) {
                                         Badge(
                                             modifier = Modifier.padding(start = 6.dp),
                                             containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
@@ -328,62 +562,79 @@ fun FlashcardScreen(viewModel: FlashcardViewModel = viewModel(), onStartStudy: (
                                 }
                             }
                         )
-                    }
-                }
-
-                // Flashcard List
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(
-                        items = flashcards,
-                        key = { it.id }
-                    ) { flashcard ->
-                        val dismissState = rememberSwipeToDismissBoxState(
-                            confirmValueChange = {
-                                if ((it == SwipeToDismissBoxValue.EndToStart) || (it == SwipeToDismissBoxValue.StartToEnd)) {
-                                    viewModel.deleteFlashcard(flashcard)
-                                    true
-                                } else false
-                            }
-                        )
-
-                        SwipeToDismissBox(
-                            state = dismissState,
-                            backgroundContent = {
-                                val color by animateColorAsState(
-                                    when (dismissState.targetValue) {
-                                        SwipeToDismissBoxValue.Settled -> Color.Transparent
-                                        else -> MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
-                                    },
-                                    label = "Dismiss Color"
-                                )
-                                Box(
-                                    Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .background(color)
-                                        .padding(horizontal = 20.dp),
-                                    contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                        ) {
-                            FlashcardItem(
-                                flashcard,
-                                onDelete = { viewModel.deleteFlashcard(flashcard) },
-                                onEdit = {
-                                    editingFlashcard = flashcard
-                                    questionText = flashcard.question
-                                    answerText = flashcard.answer
-                                    categoryText = flashcard.category
+                        categories.forEach { category ->
+                            Tab(
+                                selected = selectedCategory == category,
+                                onClick = { viewModel.setSelectedCategory(category) },
+                                text = { 
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(category.uppercase(), fontWeight = if (selectedCategory == category) FontWeight.Bold else FontWeight.Normal)
+                                        if (selectedCategory == category) {
+                                            Badge(
+                                                modifier = Modifier.padding(start = 6.dp),
+                                                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                                contentColor = MaterialTheme.colorScheme.primary
+                                            ) { Text(flashcards.size.toString()) }
+                                        }
+                                    }
                                 }
                             )
                         }
                     }
+                }
+
+                // Flashcard Items
+                items(
+                    items = flashcards,
+                    key = { it.id }
+                ) { flashcard ->
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = {
+                            if ((it == SwipeToDismissBoxValue.EndToStart) || (it == SwipeToDismissBoxValue.StartToEnd)) {
+                                viewModel.moveToTrash(flashcard)
+                                true
+                            } else false
+                        }
+                    )
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        backgroundContent = {
+                            val color by animateColorAsState(
+                                when (dismissState.targetValue) {
+                                    SwipeToDismissBoxValue.Settled -> Color.Transparent
+                                    else -> MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
+                                },
+                                label = "Dismiss Color"
+                            )
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(color)
+                                    .padding(horizontal = 20.dp),
+                                contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+                            ) {
+                                Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    ) {
+                        FlashcardItem(
+                            flashcard,
+                            onDelete = { viewModel.moveToTrash(flashcard) },
+                            onEdit = {
+                                editingFlashcard = flashcard
+                                questionText = flashcard.question
+                                answerText = flashcard.answer
+                                categoryText = flashcard.category
+                            }
+                        )
+                    }
+                }
+                
+                // Bottom spacing for FAB
+                item {
+                    Spacer(modifier = Modifier.height(80.dp))
                 }
             }
         }
@@ -530,7 +781,7 @@ fun FlashcardItem(
             }
             IconButton(onClick = onDelete) {
                 Icon(
-                    Icons.Default.Delete,
+                    Icons.Default.DeleteOutline,
                     contentDescription = "Delete",
                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                 )
@@ -779,6 +1030,89 @@ fun StudyScreen(viewModel: FlashcardViewModel = viewModel(), onExit: () -> Unit)
                                 contentDescription = "Next",
                                 tint = Color.White
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TrashScreen(viewModel: FlashcardViewModel = viewModel(), onBack: () -> Unit) {
+    val trashedCards by viewModel.trashedFlashcards.collectAsState()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF09090B), Color(0xFF0F172A))
+                )
+            )
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            "RECYCLE BIN",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        if (trashedCards.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.emptyTrash() }) {
+                                Icon(Icons.Default.DeleteForever, contentDescription = "Empty Trash", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.Transparent
+                    )
+                )
+            }
+        ) { padding ->
+            if (trashedCards.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.White.copy(alpha = 0.2f))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Your recycle bin is empty", color = Color.White.copy(alpha = 0.5f))
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(trashedCards, key = { it.id }) { card ->
+                        GlassCard {
+                            Row(
+                                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(card.question, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(card.answer, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.6f))
+                                }
+                                IconButton(onClick = { viewModel.restoreFromTrash(card) }) {
+                                    Icon(Icons.Default.Restore, contentDescription = "Restore", tint = MaterialTheme.colorScheme.primary)
+                                }
+                                IconButton(onClick = { viewModel.deletePermanently(card) }) {
+                                    Icon(Icons.Default.DeleteForever, contentDescription = "Delete Permanently", tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
                         }
                     }
                 }

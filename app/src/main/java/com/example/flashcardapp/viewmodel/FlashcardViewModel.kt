@@ -47,6 +47,27 @@ class FlashcardViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+        
+    val trashedFlashcards: StateFlow<List<Flashcard>> = repository.getTrashedFlashcards()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val autoCloseSeconds: StateFlow<Int> = userPreferencesRepository.autoCloseSecondsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 30)
+
+    val appearanceIntervalMinutes: StateFlow<Int> = userPreferencesRepository.appearanceIntervalMinutesFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1)
+
+    fun setAutoCloseSeconds(seconds: Int) {
+        viewModelScope.launch {
+            userPreferencesRepository.saveAutoCloseSeconds(seconds)
+        }
+    }
+
+    fun setAppearanceIntervalMinutes(minutes: Int) {
+        viewModelScope.launch {
+            userPreferencesRepository.saveAppearanceIntervalMinutes(minutes)
+        }
+    }
 
     fun setSelectedCategory(category: String?) {
         viewModelScope.launch {
@@ -70,9 +91,27 @@ class FlashcardViewModel @Inject constructor(
         }
     }
 
-    fun deleteFlashcard(flashcard: Flashcard) {
+    fun moveToTrash(flashcard: Flashcard) {
+        viewModelScope.launch {
+            repository.moveToTrash(flashcard)
+        }
+    }
+
+    fun restoreFromTrash(flashcard: Flashcard) {
+        viewModelScope.launch {
+            repository.restoreFromTrash(flashcard)
+        }
+    }
+
+    fun deletePermanently(flashcard: Flashcard) {
         viewModelScope.launch {
             repository.deleteFlashcard(flashcard)
+        }
+    }
+    
+    fun emptyTrash() {
+        viewModelScope.launch {
+            repository.emptyTrash()
         }
     }
 }
