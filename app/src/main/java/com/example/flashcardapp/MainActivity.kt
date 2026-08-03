@@ -33,6 +33,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.window.PopupProperties
@@ -198,213 +201,222 @@ fun SettingsScreen(
                 )
             }
         ) { padding ->
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(vertical = 16.dp)
             ) {
                 // Overlay Permissions & Toggle
-                GlassCard {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            "FLOATING UI PERMISSIONS",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            GlassButton(
-                                onClick = {
-                                    if (!Settings.canDrawOverlays(context)) {
-                                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri())
-                                        context.startActivity(intent)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                text = "GRANT",
-                                icon = Icons.Default.Security
+                item {
+                    GlassCard {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Text(
+                                "FLOATING UI PERMISSIONS",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
                             )
-
-                            GlassButton(
-                                onClick = {
-                                    if (Settings.canDrawOverlays(context)) {
-                                        val intent = Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java).apply {
-                                            action = "ACTION_SHOW_CARDS"
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                GlassButton(
+                                    onClick = {
+                                        if (!Settings.canDrawOverlays(context)) {
+                                            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri())
+                                            context.startActivity(intent)
                                         }
-                                        context.startService(intent)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                text = "START",
-                                icon = Icons.Default.Layers,
-                                accentColor = MaterialTheme.colorScheme.secondary
-                            )
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    text = "GRANT",
+                                    icon = Icons.Default.Security
+                                )
+
+                                GlassButton(
+                                    onClick = {
+                                        if (Settings.canDrawOverlays(context)) {
+                                            val intent = Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java).apply {
+                                                action = "ACTION_SHOW_CARDS"
+                                            }
+                                            context.startService(intent)
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    text = "START",
+                                    icon = Icons.Default.Layers,
+                                    accentColor = MaterialTheme.colorScheme.secondary
+                                )
+                            }
                         }
                     }
                 }
 
-                GlassCard {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                "AUTO-CLOSE TIMER",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Close floating card after ${autoCloseSeconds}s of inactivity",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Slider(
-                            value = autoCloseSeconds.toFloat(),
-                            onValueChange = { viewModel.setAutoCloseSeconds(it.toInt()) },
-                            valueRange = 5f..120f,
-                            steps = 23
-                        )
-                    }
-                }
-
-                GlassCard {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                "APPEARANCE INTERVAL",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Show a flashcard every $appearanceIntervalMinutes minute(s)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Slider(
-                            value = appearanceIntervalMinutes.toFloat(),
-                            onValueChange = { viewModel.setAppearanceIntervalMinutes(it.toInt()) },
-                            valueRange = 1f..60f,
-                            steps = 59
-                        )
-                    }
-                }
-
-                GlassCard {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                item {
+                    GlassCard {
+                        Column(modifier = Modifier.padding(20.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Dock, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                                Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    "QUICK-CREATE SIDEBAR",
+                                    "AUTO-CLOSE TIMER",
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            Switch(
-                                checked = sidebarEnabled,
-                                onCheckedChange = { enabled ->
-                                    viewModel.setSidebarEnabled(enabled)
-                                    if (enabled && Settings.canDrawOverlays(context)) {
-                                        val intent = Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java).apply {
-                                            action = "ACTION_START_SIDEBAR"
-                                            putExtra("EXTRA_SETTINGS_MODE", currentScreen == AppScreen.Settings)
-                                        }
-                                        context.startService(intent)
-                                    }
-                                }
-                            )
-                        }
-
-                        if (sidebarEnabled) {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                "Side position",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                listOf("Left", "Right").forEach { side ->
-                                    OutlinedButton(
-                                        onClick = { viewModel.setSidebarSide(side) },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(12.dp),
-                                        border = BorderStroke(
-                                            1.dp, 
-                                            if (sidebarSide == side) MaterialTheme.colorScheme.primary 
-                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                                        ),
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            containerColor = if (sidebarSide == side) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) 
-                                                            else Color.Transparent
-                                        )
-                                    ) {
-                                        Text(
-                                            side, 
-                                            color = if (sidebarSide == side) MaterialTheme.colorScheme.primary 
-                                                    else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                            
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                "Sidebar Height: ${sidebarHeight}dp",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Slider(
-                                value = sidebarHeight.toFloat(),
-                                onValueChange = { viewModel.setSidebarHeight(it.toInt()) },
-                                valueRange = 50f..400f,
-                                steps = 34
-                            )
-                            
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                "Vertical Offset: ${sidebarVerticalOffset}dp",
+                                "Close floating card after ${autoCloseSeconds}s of inactivity",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(modifier = Modifier.height(16.dp))
                             Slider(
-                                value = sidebarVerticalOffset.toFloat(),
-                                onValueChange = { viewModel.setSidebarVerticalOffset(it.toInt()) },
-                                valueRange = -600f..600f,
-                                steps = 120
+                                value = autoCloseSeconds.toFloat(),
+                                onValueChange = { viewModel.setAutoCloseSeconds(it.toInt()) },
+                                valueRange = 5f..120f,
+                                steps = 23
                             )
                         }
                     }
                 }
-                
-                Spacer(modifier = Modifier.weight(1f))
-                
-                Text(
-                    "Note: Settings apply to the Floating UI.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
+
+                item {
+                    GlassCard {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    "APPEARANCE INTERVAL",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Show a flashcard every $appearanceIntervalMinutes minute(s)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Slider(
+                                value = appearanceIntervalMinutes.toFloat(),
+                                onValueChange = { viewModel.setAppearanceIntervalMinutes(it.toInt()) },
+                                valueRange = 1f..60f,
+                                steps = 59
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    GlassCard {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Dock, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        "QUICK-CREATE SIDEBAR",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Switch(
+                                    checked = sidebarEnabled,
+                                    onCheckedChange = { enabled ->
+                                        viewModel.setSidebarEnabled(enabled)
+                                        if (enabled && Settings.canDrawOverlays(context)) {
+                                            val intent = Intent(context, com.example.flashcardapp.service.FloatingFlashcardService::class.java).apply {
+                                                action = "ACTION_START_SIDEBAR"
+                                                putExtra("EXTRA_SETTINGS_MODE", currentScreen == AppScreen.Settings)
+                                            }
+                                            context.startService(intent)
+                                        }
+                                    }
+                                )
+                            }
+
+                            if (sidebarEnabled) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "Side position",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    listOf("Left", "Right").forEach { side ->
+                                        OutlinedButton(
+                                            onClick = { viewModel.setSidebarSide(side) },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(12.dp),
+                                            border = BorderStroke(
+                                                1.dp,
+                                                if (sidebarSide == side) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                            ),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                containerColor = if (sidebarSide == side) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                                else Color.Transparent
+                                            )
+                                        ) {
+                                            Text(
+                                                side,
+                                                color = if (sidebarSide == side) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "Sidebar Height: ${sidebarHeight}dp",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Slider(
+                                    value = sidebarHeight.toFloat(),
+                                    onValueChange = { viewModel.setSidebarHeight(it.toInt()) },
+                                    valueRange = 50f..400f,
+                                    steps = 34
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "Vertical Offset: ${sidebarVerticalOffset}dp",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Slider(
+                                    value = sidebarVerticalOffset.toFloat(),
+                                    onValueChange = { viewModel.setSidebarVerticalOffset(it.toInt()) },
+                                    valueRange = -600f..600f,
+                                    steps = 120
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text(
+                        "Note: Settings apply to the Floating UI.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }

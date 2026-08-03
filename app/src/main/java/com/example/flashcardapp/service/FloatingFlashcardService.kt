@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import android.widget.Toast
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collectLatest
@@ -81,7 +82,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
     private var quickCreateView: ComposeView? = null
     private var tts: TextToSpeech? = null
 
-    private var isSettingsMode = false
+    private val isSettingsModeFlow = MutableStateFlow(false)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
     override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
     
@@ -140,21 +141,33 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         savedStateRegistryController.performRestore(null)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         
-        setupSidebarTrigger()
+        startSidebarCollector()
     }
 
     private fun setupSidebarTrigger() {
-        lifecycleScope.launch {
+        if (appearanceJob?.isActive == true && isViewAdded) {
+            // Logic to prevent multiple collectors if called again
+            // However, we need a better way to manage long-running collectors.
+            // Let's use a dedicated scope or job for the sidebar trigger.
+        }
+    }
+    
+    private var sidebarCollectorJob: Job? = null
+
+    private fun startSidebarCollector() {
+        sidebarCollectorJob?.cancel()
+        sidebarCollectorJob = lifecycleScope.launch {
             combine(
                 userPreferencesRepository.sidebarSideFlow,
                 userPreferencesRepository.sidebarHeightFlow,
                 userPreferencesRepository.sidebarVerticalOffsetFlow,
-                userPreferencesRepository.sidebarEnabledFlow
-            ) { side: String, height: Int, offset: Int, enabled: Boolean ->
-                DataBundle(side, height, offset, enabled)
+                userPreferencesRepository.sidebarEnabledFlow,
+                isSettingsModeFlow
+            ) { side, height, offset, enabled, settingsMode ->
+                DataBundle(side, height, offset, enabled, settingsMode)
             }.collectLatest { data ->
                 if (data.enabled) {
-                    updateSidebarPosition(data.side, data.height, data.offset)
+                    updateSidebarPosition(data.side, data.height, data.offset, data.settingsMode)
                 } else {
                     removeSidebar()
                 }
@@ -162,7 +175,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         }
     }
 
-    private data class DataBundle(val side: String, val height: Int, val offset: Int, val enabled: Boolean)
+    private data class DataBundle(val side: String, val height: Int, val offset: Int, val enabled: Boolean, val settingsMode: Boolean)
 
     private fun removeSidebar() {
         sidebarView?.let {
@@ -173,7 +186,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         sidebarView = null
     }
 
-    private fun updateSidebarPosition(side: String, height: Int, offset: Int) {
+    private fun updateSidebarPosition(side: String, height: Int, offset: Int, settingsMode: Boolean) {
         sidebarView?.let { 
             try {
                 windowManager.removeView(it)
@@ -181,7 +194,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         }
         
         val sidebarParams = WindowManager.LayoutParams(
-            30.toPx(), // Width of the trigger button
+            30.toPx(), 
             height.toPx(),
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
@@ -205,7 +218,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                             else RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
                         )
                         .then(
-                            if (isSettingsMode) {
+                            if (settingsMode) {
                                 Modifier.background(
                                     Brush.horizontalGradient(
                                         colors = if (side == "Left") listOf(color, color.copy(alpha = 0.2f))
@@ -229,7 +242,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isSettingsMode) {
+                    if (settingsMode) {
                         Icon(
                             imageVector = if (side == "Left") Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
                             contentDescription = null,
@@ -294,15 +307,12 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val result = super.onStartCommand(intent, flags, startId)
         
-        isSettingsMode = intent?.getBooleanExtra(EXTRA_SETTINGS_MODE, false) ?: false
+        val settingsMode = intent?.getBooleanExtra(EXTRA_SETTINGS_MODE, false) ?: false
+        isSettingsModeFlow.value = settingsMode
         
         when (intent?.action) {
             ACTION_SHOW_CARDS -> startAppearanceTimer()
-            ACTION_START_SIDEBAR -> { /* Sidebar trigger is always setup in onCreate */ }
         }
-        
-        // Re-setup sidebar trigger to apply settings mode visibility change
-        setupSidebarTrigger()
 
         return result
     }
