@@ -108,10 +108,11 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.WRAP_CONTENT,
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM,
+        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
         PixelFormat.TRANSLUCENT,
     ).apply {
         gravity = Gravity.CENTER
+        softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
     }
 
     override fun onInit(status: Int) {
@@ -189,12 +190,13 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
     private fun updateSidebarPosition(side: String, height: Int, offset: Int, settingsMode: Boolean) {
         sidebarView?.let { 
             try {
-                windowManager.removeView(it)
+                windowManager.removeViewImmediate(it)
+                it.disposeComposition()
             } catch (e: Exception) {}
         }
         
         val sidebarParams = WindowManager.LayoutParams(
-            30.toPx(), 
+            40.toPx(), 
             height.toPx(),
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
@@ -217,22 +219,22 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                             if (side == "Left") RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)
                             else RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
                         )
-                        .then(
+                        .background(
                             if (settingsMode) {
-                                Modifier.background(
-                                    Brush.horizontalGradient(
-                                        colors = if (side == "Left") listOf(color, color.copy(alpha = 0.2f))
-                                                 else listOf(color.copy(alpha = 0.2f), color)
-                                    )
+                                Brush.horizontalGradient(
+                                    colors = if (side == "Left") listOf(color, color.copy(alpha = 0.2f))
+                                             else listOf(color.copy(alpha = 0.2f), color)
                                 )
                             } else {
-                                Modifier.background(Color.Transparent)
+                                Brush.horizontalGradient(
+                                    colors = listOf(Color.White.copy(alpha = 0.01f), Color.White.copy(alpha = 0.01f))
+                                )
                             }
                         )
                         .clickable { showQuickCreateDialog() }
-                        .pointerInput(Unit) {
+                        .pointerInput(side) {
                             detectHorizontalDragGestures { _, dragAmount ->
-                                val threshold = 10f
+                                val threshold = 5f
                                 if (side == "Left" && dragAmount > threshold) {
                                     showQuickCreateDialog()
                                 } else if (side == "Right" && dragAmount < -threshold) {
@@ -267,6 +269,8 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         if (quickCreateView != null) return
 
         quickCreateView = ComposeView(this).apply {
+            isFocusable = true
+            isFocusableInTouchMode = true
             setContent {
                 val darkTheme = isSystemInDarkTheme()
                 val colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()
@@ -291,7 +295,13 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         quickCreateView?.setViewTreeLifecycleOwner(this)
         quickCreateView?.setViewTreeSavedStateRegistryOwner(this)
         quickCreateView?.setViewTreeViewModelStoreOwner(this)
-        windowManager.addView(quickCreateView, quickCreateParams)
+        
+        try {
+            windowManager.addView(quickCreateView, quickCreateParams)
+            quickCreateView?.post {
+                quickCreateView?.requestFocus()
+            }
+        } catch (e: Exception) {}
     }
 
     private fun hideQuickCreateDialog() {
