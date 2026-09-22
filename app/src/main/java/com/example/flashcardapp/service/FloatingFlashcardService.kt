@@ -84,6 +84,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
     private var tts: TextToSpeech? = null
 
     private val isSettingsModeFlow = MutableStateFlow(false)
+    private val isInAppFlow = MutableStateFlow(false)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
     override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
     
@@ -163,20 +164,20 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                 userPreferencesRepository.sidebarSideFlow,
                 userPreferencesRepository.sidebarHeightFlow,
                 userPreferencesRepository.sidebarVerticalOffsetFlow,
-                userPreferencesRepository.sidebarEnabledFlow,
-                userPreferencesRepository.sidebarOpacityFlow
-            ) { side, height, offset, enabled, opacity ->
-                SidebarProps(side, height, offset, enabled, opacity)
+                userPreferencesRepository.sidebarEnabledFlow
+            ) { side, height, offset, enabled ->
+                SidebarProps(side, height, offset, enabled)
             }
 
             combine(
                 sidebarPropsFlow,
-                isSettingsModeFlow
-            ) { props, settingsMode ->
-                DataBundle(props.side, props.height, props.offset, props.enabled, settingsMode, props.opacity)
+                isSettingsModeFlow,
+                isInAppFlow
+            ) { props, settingsMode, inApp ->
+                DataBundle(props.side, props.height, props.offset, props.enabled, settingsMode, inApp)
             }.collectLatest { data ->
                 if (data.enabled) {
-                    updateSidebarPosition(data.side, data.height, data.offset, data.settingsMode, data.opacity)
+                    updateSidebarPosition(data.side, data.height, data.offset, data.settingsMode, data.inApp)
                 } else {
                     removeSidebar()
                 }
@@ -184,8 +185,8 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         }
     }
 
-    private data class SidebarProps(val side: String, val height: Int, val offset: Int, val enabled: Boolean, val opacity: Float)
-    private data class DataBundle(val side: String, val height: Int, val offset: Int, val enabled: Boolean, val settingsMode: Boolean, val opacity: Float)
+    private data class SidebarProps(val side: String, val height: Int, val offset: Int, val enabled: Boolean)
+    private data class DataBundle(val side: String, val height: Int, val offset: Int, val enabled: Boolean, val settingsMode: Boolean, val inApp: Boolean)
 
     private fun removeSidebar() {
         sidebarView?.let {
@@ -196,7 +197,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         sidebarView = null
     }
 
-    private fun updateSidebarPosition(side: String, height: Int, offset: Int, settingsMode: Boolean, opacity: Float) {
+    private fun updateSidebarPosition(side: String, height: Int, offset: Int, settingsMode: Boolean, inApp: Boolean) {
         sidebarView?.let { 
             try {
                 windowManager.removeViewImmediate(it)
@@ -229,13 +230,13 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                             else RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
                         )
                         .background(
-                            if (settingsMode) {
+                            if (settingsMode || inApp) {
                                 Brush.horizontalGradient(
                                     colors = if (side == "Left") listOf(color, color.copy(alpha = 0.2f))
                                              else listOf(color.copy(alpha = 0.2f), color)
                                 )
                             } else {
-                                SolidColor(color.copy(alpha = opacity))
+                                SolidColor(Color.Transparent)
                             }
                         )
                         .clickable { showQuickCreateDialog() }
@@ -251,7 +252,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (settingsMode) {
+                    if (settingsMode || inApp) {
                         Icon(
                             imageVector = if (side == "Left") Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
                             contentDescription = null,
@@ -326,6 +327,9 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         
         val settingsMode = intent?.getBooleanExtra(EXTRA_SETTINGS_MODE, false) ?: false
         isSettingsModeFlow.value = settingsMode
+
+        val inApp = intent?.getBooleanExtra("EXTRA_IN_APP", false) ?: false
+        isInAppFlow.value = inApp
         
         when (intent?.action) {
             ACTION_SHOW_CARDS -> startAppearanceTimer()
