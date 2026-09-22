@@ -414,8 +414,8 @@ fun SettingsScreen(
                                 Slider(
                                     value = sidebarOpacity,
                                     onValueChange = { viewModel.setSidebarOpacity(it) },
-                                    valueRange = 0.05f..1f,
-                                    steps = 19
+                                    valueRange = 0f..1f,
+                                    steps = 20
                                 )
                             }
                         }
