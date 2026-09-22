@@ -69,6 +69,9 @@ class FlashcardViewModel @Inject constructor(
     val sidebarEnabled: StateFlow<Boolean> = userPreferencesRepository.sidebarEnabledFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val sidebarOpacity: StateFlow<Float> = userPreferencesRepository.sidebarOpacityFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.5f)
+
     fun setAutoCloseSeconds(seconds: Int) {
         viewModelScope.launch {
             userPreferencesRepository.saveAutoCloseSeconds(seconds)
@@ -102,6 +105,12 @@ class FlashcardViewModel @Inject constructor(
     fun setSidebarEnabled(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.saveSidebarEnabled(enabled)
+        }
+    }
+
+    fun setSidebarOpacity(opacity: Float) {
+        viewModelScope.launch {
+            userPreferencesRepository.saveSidebarOpacity(opacity)
         }
     }
 

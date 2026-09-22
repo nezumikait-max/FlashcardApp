@@ -167,6 +167,7 @@ fun SettingsScreen(
     val sidebarHeight by viewModel.sidebarHeight.collectAsState()
     val sidebarVerticalOffset by viewModel.sidebarVerticalOffset.collectAsState()
     val sidebarEnabled by viewModel.sidebarEnabled.collectAsState()
+    val sidebarOpacity by viewModel.sidebarOpacity.collectAsState()
     val context = LocalContext.current
 
     Box(
@@ -402,6 +403,19 @@ fun SettingsScreen(
                                     onValueChange = { viewModel.setSidebarVerticalOffset(it.toInt()) },
                                     valueRange = -600f..600f,
                                     steps = 120
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "Sidebar Opacity / Transparency: ${(sidebarOpacity * 100).toInt()}%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Slider(
+                                    value = sidebarOpacity,
+                                    onValueChange = { viewModel.setSidebarOpacity(it) },
+                                    valueRange = 0.05f..1f,
+                                    steps = 19
                                 )
                             }
                         }

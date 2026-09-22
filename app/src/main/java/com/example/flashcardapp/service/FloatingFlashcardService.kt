@@ -158,17 +158,24 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
     private fun startSidebarCollector() {
         sidebarCollectorJob?.cancel()
         sidebarCollectorJob = lifecycleScope.launch {
-            combine(
+            val sidebarPropsFlow = combine(
                 userPreferencesRepository.sidebarSideFlow,
                 userPreferencesRepository.sidebarHeightFlow,
                 userPreferencesRepository.sidebarVerticalOffsetFlow,
                 userPreferencesRepository.sidebarEnabledFlow,
+                userPreferencesRepository.sidebarOpacityFlow
+            ) { side, height, offset, enabled, opacity ->
+                SidebarProps(side, height, offset, enabled, opacity)
+            }
+
+            combine(
+                sidebarPropsFlow,
                 isSettingsModeFlow
-            ) { side, height, offset, enabled, settingsMode ->
-                DataBundle(side, height, offset, enabled, settingsMode)
+            ) { props, settingsMode ->
+                DataBundle(props.side, props.height, props.offset, props.enabled, settingsMode, props.opacity)
             }.collectLatest { data ->
                 if (data.enabled) {
-                    updateSidebarPosition(data.side, data.height, data.offset, data.settingsMode)
+                    updateSidebarPosition(data.side, data.height, data.offset, data.settingsMode, data.opacity)
                 } else {
                     removeSidebar()
                 }
@@ -176,7 +183,8 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         }
     }
 
-    private data class DataBundle(val side: String, val height: Int, val offset: Int, val enabled: Boolean, val settingsMode: Boolean)
+    private data class SidebarProps(val side: String, val height: Int, val offset: Int, val enabled: Boolean, val opacity: Float)
+    private data class DataBundle(val side: String, val height: Int, val offset: Int, val enabled: Boolean, val settingsMode: Boolean, val opacity: Float)
 
     private fun removeSidebar() {
         sidebarView?.let {
@@ -187,7 +195,7 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
         sidebarView = null
     }
 
-    private fun updateSidebarPosition(side: String, height: Int, offset: Int, settingsMode: Boolean) {
+    private fun updateSidebarPosition(side: String, height: Int, offset: Int, settingsMode: Boolean, opacity: Float) {
         sidebarView?.let { 
             try {
                 windowManager.removeViewImmediate(it)
@@ -227,7 +235,8 @@ class FloatingFlashcardService : LifecycleService(), SavedStateRegistryOwner, Vi
                                 )
                             } else {
                                 Brush.horizontalGradient(
-                                    colors = listOf(Color.White.copy(alpha = 0.01f), Color.White.copy(alpha = 0.01f))
+                                    colors = if (side == "Left") listOf(color.copy(alpha = opacity), color.copy(alpha = opacity * 0.3f))
+                                             else listOf(color.copy(alpha = opacity * 0.3f), color.copy(alpha = opacity))
                                 )
                             }
                         )

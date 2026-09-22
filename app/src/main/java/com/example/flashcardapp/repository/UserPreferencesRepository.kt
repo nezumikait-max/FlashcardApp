@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -26,6 +27,7 @@ class UserPreferencesRepository @Inject constructor(
         val SIDEBAR_HEIGHT = intPreferencesKey("sidebar_height")
         val SIDEBAR_VERTICAL_OFFSET = intPreferencesKey("sidebar_vertical_offset")
         val SIDEBAR_ENABLED = booleanPreferencesKey("sidebar_enabled")
+        val SIDEBAR_OPACITY = floatPreferencesKey("sidebar_opacity")
     }
 
     val selectedCategoryFlow: Flow<String?> = context.dataStore.data
@@ -61,6 +63,11 @@ class UserPreferencesRepository @Inject constructor(
     val sidebarEnabledFlow: Flow<Boolean> = context.dataStore.data
         .map { preferences -> 
             preferences[PreferencesKeys.SIDEBAR_ENABLED] ?: false
+        }
+
+    val sidebarOpacityFlow: Flow<Float> = context.dataStore.data
+        .map { preferences -> 
+            preferences[PreferencesKeys.SIDEBAR_OPACITY] ?: 0.5f
         }
 
     suspend fun saveSelectedCategory(category: String?) {
@@ -106,6 +113,12 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun saveSidebarEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.SIDEBAR_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveSidebarOpacity(opacity: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SIDEBAR_OPACITY] = opacity
         }
     }
 }
